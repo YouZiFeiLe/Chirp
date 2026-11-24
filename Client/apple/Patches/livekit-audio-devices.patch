@@ -1,0 +1,135 @@
+diff --git a/Sources/LiveKit/Audio/AudioSessionEngineObserver.swift b/Sources/LiveKit/Audio/AudioSessionEngineObserver.swift
+index e1f1ab9..9dda2d8 100644
+--- a/Sources/LiveKit/Audio/AudioSessionEngineObserver.swift
++++ b/Sources/LiveKit/Audio/AudioSessionEngineObserver.swift
+@@ -64,12 +64,29 @@ public class AudioSessionEngineObserver: AudioEngineObserver, Loggable, @uncheck
+         set { _state.mutate { $0.isSpeakerOutputPreferred = newValue } }
+     }
+ 
++    /// Applies a user-selected built-in route without opening the microphone.
++    /// An explicit choice also needs playAndRecord while only listening, since
++    /// playback cannot select the receiver or override a headset with speaker.
++    /// Unlike the legacy preference setter, configuration failures reach the UI.
++    public func chirpSetSpeakerOutputOverride(_ speaker: Bool?, inputSelected: Bool = false) throws {
++        try _state.mutate {
++            let previous = $0
++            guard previous.chirpSpeakerOutputOverride != speaker || previous.chirpInputSelected != inputSelected else { return }
++            $0.chirpSpeakerOutputOverride = speaker
++            $0.chirpInputSelected = inputSelected
++            do { try configureIfNeeded(oldState: previous, newState: $0) }
++            catch { $0 = previous; throw error }
++        }
++    }
++
+     struct State {
+         var next: (any AudioEngineObserver)?
+ 
+         var isAutomaticConfigurationEnabled: Bool = true
+         var isAutomaticDeactivationEnabled: Bool = true
+         var isSpeakerOutputPreferred: Bool = true
++        var chirpSpeakerOutputOverride: Bool?
++        var chirpInputSelected = false
+ 
+         // Whether the next capture is expected to use Apple's voice processing
+         // path. Updated by AudioManager before recording starts, since the ADM
+@@ -252,11 +269,12 @@ public class AudioSessionEngineObserver: AudioEngineObserver, Loggable, @uncheck
+     /// software processing the media-tuned presets keep remote audio at media
+     /// playback loudness.
+     static func selectConfiguration(state: State) -> AudioSessionConfiguration {
+-        guard state.isRecordingEnabled || state.hasRecorded else { return .playback }
++        guard state.isRecordingEnabled || state.hasRecorded || state.chirpSpeakerOutputOverride != nil || state.chirpInputSelected else { return .playback }
++        let speaker = state.chirpSpeakerOutputOverride ?? state.isSpeakerOutputPreferred
+         return if state.isPlatformVoiceProcessingExpected {
+-            state.isSpeakerOutputPreferred ? .playAndRecordSpeaker : .playAndRecordReceiver
++            speaker ? .playAndRecordSpeaker : .playAndRecordReceiver
+         } else {
+-            state.isSpeakerOutputPreferred ? .playAndRecordSpeakerMedia : .playAndRecordReceiverMedia
++            speaker ? .playAndRecordSpeakerMedia : .playAndRecordReceiverMedia
+         }
+     }
+ 
+diff --git a/Sources/LiveKit/Audio/Manager/AudioManager+ChirpDevices.swift b/Sources/LiveKit/Audio/Manager/AudioManager+ChirpDevices.swift
+new file mode 100644
+index 0000000..a017dd9
+--- /dev/null
++++ b/Sources/LiveKit/Audio/Manager/AudioManager+ChirpDevices.swift
+@@ -0,0 +1,79 @@
++import Foundation
++internal import LiveKitWebRTC
++
++/// Keeps the pinned WebRTC media engine (and its capture callback) alive.
++/// No SDP is negotiated and no ICE gathering or network connection is started.
++public struct ChirpLocalAudioCapture: Sendable {
++    private let connection: RTCBox<LKRTCPeerConnection>
++
++    fileprivate init(_ connection: LKRTCPeerConnection) { self.connection = RTCBox(connection) }
++
++    /// The pinned ADM applies device options but does not configure WebRTC's
++    /// software APM when there is no published sender. Apply both halves for
++    /// the app's explicit platform/software presets; do not guess automatic modes.
++    public func startRecording(audioProcessingOptions options: AudioProcessingOptions) async throws {
++        guard (!options.echoCancellation || options.echoCancellationMode != .automatic),
++              (!options.autoGainControl || options.autoGainControlMode != .automatic),
++              (!options.noiseSuppression || options.noiseSuppressionMode != .automatic) else {
++            throw LiveKitError(.invalidParameter, message: "Local capture requires explicit processing modes")
++        }
++        try await RTC.run {
++            try AudioManager.shared.startLocalRecording(audioProcessingOptions: options)
++            let config = RTC.audioProcessingModule.config
++            config.isEchoCancellationEnabled = options.echoCancellation && options.echoCancellationMode == .software
++            config.isNoiseSuppressionEnabled = options.noiseSuppression && options.noiseSuppressionMode == .software
++            // The pinned native resolver uses fixed-digital GC1 on Apple.
++            // Media engine initialization already selects that GC1 mode.
++            config.isAutoGainControl1Enabled = options.autoGainControl && options.autoGainControlMode == .software
++            config.isAutoGainControl2Enabled = false
++            config.isHighpassFilterEnabled = options.highpassFilter
++            RTC.audioProcessingModule.config = config
++        }
++    }
++
++    public func close() async {
++        await RTC.run { connection.value.close() }
++    }
++}
++
++public extension AudioManager {
++    /// The media engine's last connection release unregisters the ADM callback.
++    /// A recording-only ADM or LocalAudioTrack does not own that media engine.
++    /// Hold this handle until recording has stopped, including on cancellation.
++    func chirpPrepareLocalAudioCapture() async throws -> ChirpLocalAudioCapture {
++        try await RTC.run {
++            let configuration = LKRTCConfiguration()
++            configuration.iceServers = []
++            guard let connection = RTC.createPeerConnection(configuration,
++                constraints: LKRTCMediaConstraints(mandatoryConstraints: nil, optionalConstraints: nil)) else {
++                throw LiveKitError(.invalidState, message: "Audio capture preparation failed")
++            }
++            return ChirpLocalAudioCapture(connection)
++        }
++    }
++
++    #if os(macOS)
++    /// Initializes native device enumeration without playout or recording.
++    func chirpPrepareAudioDevices() async throws {
++        let capture = try await chirpPrepareLocalAudioCapture()
++        await capture.close()
++    }
++
++    /// The pinned AudioEngine ADM has no GetRecordingDevice/GetPlayoutDevice
++    /// implementation. Its Objective-C trySet wrapper also treats native 0
++    /// (success) as false. Validate membership first, then interpret that exact
++    /// pinned convention. Keep requested device IDs in the app, not those getters.
++    func chirpSelectAudioDevice(_ device: AudioDevice, input: Bool) throws {
++        guard RTC.pcFactoryState.admType == .audioEngine else {
++            throw LiveKitError(.invalidState, message: "Unsupported audio device module")
++        }
++        let module = RTC.audioDeviceModule
++        let devices = input ? module.inputDevices : module.outputDevices
++        guard devices.contains(where: { $0.deviceId == device.deviceId }) else {
++            throw LiveKitError(.invalidParameter, message: "Audio device is unavailable")
++        }
++        let failed = input ? module.trySetInputDevice(device._ioDevice) : module.trySetOutputDevice(device._ioDevice)
++        guard !failed else { throw LiveKitError(.invalidState, message: "Audio device selection failed") }
++    }
++    #endif
++}

@@ -1,0 +1,161 @@
+// Stable client/server error codes. See Client/apple/ERROR_CODES.md.
+"NETWORK_TIME_REQUIRED" = "请先通过系统时间校验，再登录或授权设备。";
+"CLIENT_UNEXPECTED" = "操作未完成，请稍后重试";
+"CLIENT_UNKNOWN_SERVER_ERROR" = "服务器返回了未识别的错误，请稍后重试";
+"CLIENT_INVALID_RESPONSE" = "服务器没有返回有效响应";
+"CLIENT_HTTP_FAILURE" = "请求未完成，请稍后重试";
+"CLIENT_NETWORK_UNAVAILABLE" = "网络不可用，请检查网络连接";
+"CLIENT_NETWORK_TIMEOUT" = "连接超时，请稍后重试";
+"CLIENT_NETWORK_FAILURE" = "网络连接中断，请稍后重试";
+"CLIENT_INVALID_SERVER_ADDRESS" = "请输入有效的自有服务器地址";
+"CLIENT_HOSTED_SERVER_UNSUPPORTED" = "此应用只连接自托管 LiveKit";
+"CLIENT_INSECURE_SERVER_ADDRESS" = "服务器地址必须使用 HTTPS 或 WSS";
+"CLIENT_INVALID_ROOM_LIST" = "服务器返回的房间列表无效";
+"CLIENT_INVALID_PREFLIGHT" = "服务器返回的入房预校验无效，请重新验证";
+"CLIENT_INVALID_ADMISSION" = "服务器返回的房间或入房安全策略不匹配";
+"CLIENT_INVALID_JOIN_SEQUENCE" = "入房序列无效，请重新登录";
+"CLIENT_JOIN_SEQUENCE_EXHAUSTED" = "入房序列已用尽，请重新登录";
+"CLIENT_LEAVE_FAILED" = "离房请求未完成";
+"CLIENT_INVALID_LOGIN_CALLBACK" = "登录回调地址不正确，请重试";
+"CLIENT_LOGIN_VERIFICATION_FAILED" = "登录校验不匹配或已失效，请重新登录";
+"CLIENT_SECURE_LOGIN_FAILED" = "无法创建安全登录请求";
+"CLIENT_INVALID_LOGIN_SESSION" = "服务器返回的登录信息无效";
+"CLIENT_LOGIN_INCOMPLETE" = "本次登录未完成或已失效，请重新认证";
+"CLIENT_LOGIN_EXPIRED" = "登录已到期，请重新使用 Passkey 认证";
+"CLIENT_LOGIN_CANCELLED" = "已取消登录，可以重新认证。";
+"CLIENT_INVALID_DEVICE_AUTHORIZATION" = "服务器返回的扫码登录信息无效，请重试";
+"CLIENT_DEVICE_LOGIN_UNSUPPORTED" = "服务器暂不支持扫码登录，请使用 Passkey 登录或联系管理员";
+"CLIENT_DEVICE_REQUEST_FAILED" = "服务器没有创建有效的扫码请求";
+"CLIENT_DEVICE_STATUS_INVALID" = "扫码登录状态无效";
+"CLIENT_QR_GENERATION_FAILED" = "无法生成二维码，请重试";
+"CLIENT_CALL_BUSY" = "正在处理通话，请稍后再试";
+"CLIENT_SECURE_TRANSPORT_MISSING" = "客户端缺少必需的安全传输支持";
+"CLIENT_MICROPHONE_PERMISSION_REQUIRED" = "需要麦克风权限才能加入语音";
+"CLIENT_LOCAL_ENCRYPTION_FAILED" = "本地加密初始化失败";
+"CLIENT_MICROPHONE_UPDATE_FAILED" = "无法更新麦克风，已离开房间，请重新加入";
+"CLIENT_AUDIO_PRESET_BUSY" = "正在更新通话，请稍后切换音频预设";
+"CLIENT_AUDIO_PRESET_RECOVERY_FAILED" = "音频预设切换与恢复失败，已离开房间，请重新加入";
+"CLIENT_SECURE_CONNECTION_NOT_READY" = "安全连接尚未就绪，麦克风保持暂停";
+"CLIENT_MICROPHONE_ENCRYPTOR_NOT_READY" = "麦克风加密器未就绪";
+"CLIENT_LOCAL_TRACK_UNENCRYPTED" = "本地音轨未启用端到端加密";
+"CLIENT_REMOTE_TRACK_UNENCRYPTED" = "已拒绝未端到端加密的音轨";
+"CLIENT_VOICE_DISCONNECTED" = "语音连接已断开，请重新加入";
+"CLIENT_VOICE_CONNECTION_FAILED" = "无法建立语音连接，请稍后重新加入";
+"CLIENT_SECURE_CONNECTION_RECOVERY_FAILED" = "无法恢复安全连接，请重新加入";
+"CLIENT_AUDIO_ENCRYPTION_FAILED" = "音频加密组件失败，请重新加入";
+"CLIENT_AUDIO_ENCRYPTION_UNKNOWN" = "无法确认音频加密状态，请重新加入";
+"CLIENT_APPLE_AUDIO_UNAVAILABLE" = "当前音频策略不允许 Apple 系统处理，请选择 WebRTC 回声消除＋RNNoise";
+"CLIENT_AUDIO_PRESET_UNCONFIRMED" = "未能确认所选音频预设已生效，请重新加入或选择另一预设";
+"CLIENT_NOISE_SUPPRESSION_FAILED" = "RNNoise 降噪失败，已停止发送麦克风声音，请重新加入房间";
+"CLIENT_NOISE_INITIALIZATION_FAILED" = "RNNoise 降噪初始化失败，已停止发送麦克风声音";
+"CLIENT_NOISE_FORMAT_INVALID" = "RNNoise 音频格式异常，已停止发送麦克风声音，请重新加入房间";
+"CLIENT_NOISE_PROCESSING_FAILED" = "RNNoise 音频处理失败，已停止发送麦克风声音，请重新加入房间";
+"CLIENT_GROUP_STATE_CHANGED" = "安全群组状态已变化，请重新加入";
+"CLIENT_GROUP_UNAVAILABLE" = "群组协调服务暂时不可用，已停止语音";
+"CLIENT_INVALID_GROUP_RESPONSE" = "群组服务响应无效";
+"CLIENT_GROUP_IDENTITY_INVALID" = "安全群组身份或客户端签名验证失败";
+"CLIENT_GROUP_REQUEST_REJECTED" = "群组服务拒绝请求，请重新加入";
+"CLIENT_GROUP_LEASE_EXPIRED" = "安全连接授权已到期，已停止语音，请重新加入";
+"CLIENT_GROUP_CONNECTION_LOST" = "群组协调连接中断，已停止语音";
+"CLIENT_GROUP_MEMBERS_UNVERIFIED" = "暂时无法验证群组成员，已停止语音";
+"CLIENT_GROUP_PROTOCOL_MISMATCH" = "群组安全协议不匹配";
+"CLIENT_PREVIOUS_GROUP_ACTIVE" = "上一轮安全连接尚未结束，请稍后重新加入";
+"CLIENT_GROUP_MEMBERSHIP_LOST" = "当前设备已不在安全群组中，请重新加入";
+"CLIENT_GROUP_AUTHORIZATION_LOST" = "无法恢复群组成员授权，请重新加入";
+"CLIENT_GROUP_CONFIRMATION_MISMATCH" = "群组密钥确认不一致，已停止语音";
+"CLIENT_GROUP_LEASE_RESPONSE_EXPIRED" = "安全连接授权响应已过期";
+"CLIENT_GROUP_UPDATE_TIMED_OUT" = "安全群组更新超时，请重新加入";
+"CLIENT_GROUP_CRYPTO_FAILED" = "安全群组加密操作失败，已停止语音，请重新加入";
+"CLIENT_INVALID_MEDIA_LEASE" = "服务器返回的媒体授权期限无效";
+"CLIENT_CHAT_TEXT_TOO_LONG" = "每条消息最多 4096 UTF-8 字节，请缩短内容";
+"CLIENT_CHAT_NOT_READY" = "安全连接未就绪或消息内容无效";
+"CLIENT_CHAT_PACKET_TOO_LONG" = "消息过长，请缩短内容";
+"CLIENT_CHAT_PREPARATION_FAILED" = "消息内容无效或过长，请缩短内容后重试";
+"CLIENT_CHAT_SEND_FAILED" = "消息发送未完成，可能未送达；请在安全连接恢复后手动重新发送";
+"CLIENT_PASSWORD_TOO_LONG" = "密码输入过长，请重新输入";
+"UNAUTHORIZED" = "登录已失效、到期或已在其他设备登录，请重新认证";
+"MEMBER_DISABLED" = "账号已停用，请联系管理员";
+"ROOM_NOT_FOUND" = "房间不存在";
+"ADMISSION_CHANGED" = "入房请求已过时或失效，请重新加入";
+"ROOM_PASSWORD_REQUIRED" = "此房间需要输入入房密码";
+"ROOM_PASSWORD_INCORRECT" = "房间密码不正确，请重新输入";
+"ROOM_PASSWORD_CHANGED" = "房间密码设置已改变，请重新验证后加入";
+"ROOM_PREFLIGHT_EXPIRED" = "入房预校验已失效，请重新验证";
+"ROOM_PASSWORD_RATE_LIMITED" = "尝试过于频繁，请稍后再试";
+"ROOM_PASSWORD_BUSY" = "密码验证繁忙，请稍后再试";
+"BAD_REQUEST" = "请求内容无效，请重试";
+"INTERNAL_ERROR" = "服务暂时出现错误，请稍后重试";
+"MEDIA_SERVICE_UNAVAILABLE" = "语音服务暂时不可用，请稍后重试";
+"DEVICE_AUTHORIZATION_EXPIRED" = "二维码已过期、取消或已使用，请刷新后重新扫码";
+"INVALID_AUTHORIZATION" = "本次客户端登录已失效，请重新登录";
+"LOGIN_NOT_ALLOWED" = "此账号尚未获得登录权限，请联系管理员";
+"RETRY_LOGIN" = "登录信息已更新，请重新登录";
+"TRY_LATER" = "暂时无法接收新操作，请稍后重试";
+"UNAVAILABLE" = "服务暂时不可用，请稍后重试";
+"INVALID_PROOF" = "客户端签名或请求时效无效，请重新加入";
+"ADMISSION_EXPIRED" = "本次入房已失效，请重新加入";
+
+"CLIENT_INVALID_MEMBER_PROFILES" = "成员资料无效，请稍后重试";
+"AVATAR_TOO_LARGE" = "头像图片须小于 5 MB";
+"AVATAR_INVALID" = "图片无效，请选择其他静态图片";
+"AVATAR_DIMENSIONS_EXCEEDED" = "图片尺寸过大，请缩小后重试";
+"AVATAR_FORMAT_UNSUPPORTED" = "请上传静态 JPEG 或 PNG 图片";
+"AVATAR_BUSY" = "头像处理繁忙，请稍后重试";
+"INVALID_DISPLAY_NAME" = "昵称须为 1–80 个字符，不能包含控制字符";
+"MEMBER_NOT_FOUND" = "成员资料或头像不存在";
+
+"CLIENT_INVALID_SERVER_CONFIGURATION" = "地址未指向兼容的 Chirp 服务，或 API、认证服务暂时不可用";
+"CLIENT_SERVER_CONFIGURATION_CHANGED" = "登录、API 或群组服务地址已更改，请重新确认服务器地址";
+"CLIENT_SERVER_NOT_CONFIGURED" = "请先填写并确认服务器地址";
+"CLIENT_BROWSER_OPEN_FAILED" = "无法打开注册网页，请检查默认浏览器设置";
+"CLIENT_CONFIG_UNAVAILABLE" = "服务器尚未正确配置认证地址，请联系维护者";
+"DATABASE_UNAVAILABLE" = "服务器数据库暂时不可用，请稍后重试";
+"CLIENT_VERSION_INVALID" = "客户端版本信息无效，请安装有效的新版本后重试";
+"CLIENT_UPDATE_REQUIRED" = "客户端版本过旧，请自行升级后重试";
+"CLIENT_VERSION_POLICY_UNAVAILABLE" = "服务器版本要求暂时不可用，请稍后重试";
+
+"ATTACHMENT_INVALID" = "附件信息、格式或完整性校验失败。";
+
+"ATTACHMENT_UNAVAILABLE" = "附件已失效，或不属于本次入房。";
+
+"ATTACHMENT_QUOTA" = "附件大小或缓存配额已达上限。图片最多 20 MiB，文件最多 100 MiB。";
+
+"ATTACHMENT_CONFLICT" = "附件上传状态已改变，请重新发送。";
+
+"ATTACHMENT_PENDING" = "附件尚未上传完成。";
+
+"ATTACHMENT_BUSY" = "附件传输繁忙，请稍后重试。";
+
+"ATTACHMENTS_UNAVAILABLE" = "服务器尚未启用附件功能。";
+
+"CLIENT_ATTACHMENT_CACHE_FAILED" = "附件缓存无法读写或清理，请检查可用空间。";
+
+"CLIENT_ATTACHMENT_TRANSFER_FAILED" = "附件处理或传输失败，请重试。";
+"CLIENT_AUDIO_CONTROL_UNAVAILABLE" = "当前设备暂不支持音频控制。";
+"CLIENT_AUDIO_CONTROL_BUSY" = "音频操作尚未完成，请稍后重试。";
+"CLIENT_AUDIO_DEVICE_CHANGE_FAILED" = "无法切换音频设备，请检查设备连接。";
+"CLIENT_MICROPHONE_TEST_FAILED" = "麦克风测试未完成，请停止后重试。";
+"CLIENT_AUDIO_SERVICES_RESET" = "系统音频服务已重置，请重新加入语音。";
+"CLIENT_AUDIO_DECRYPTION_RECOVERY_FAILED" = "音轨持续无法解密，请重新加入语音。";
+"ATTACHMENT_CANCELLED" = "发送方已取消此附件。";
+"ATTACHMENT_EXPIRED" = "附件已过期，请让发送方重新选择文件发送。";
+"ATTACHMENT_INTEGRITY" = "附件完整性校验失败，无法继续传输或打开。";
+"CLIENT_AUDIO_PROCESSING_FAILED" = "麦克风音频处理失败，已停止发送声音，请重新加入房间";
+
+"DEVICE_IDENTITY_REQUIRED" = "请先由可信旧设备授权本设备，或建立首次身份，再登录。旧登录不会提前切换。";
+"V5_IDENTITY_INVALID" = "设备身份、签名或授权证明无法验证，请检查设备身份并重试。不会自动重置已验证身份。";
+"ROOM_IDENTITY_REQUIRED" = "请先通过独立可信渠道核验联系人和房主指纹，并导入有效的房间邀请。";
+"ROOM_AUTHORIZATION_INVALID" = "房间签名授权、身份或版本无效，请核验房主身份与最新授权。";
+"CLIENT_IDENTITY_CHANGED" = "已验证的身份或房间授权发生冲突，已停止通话。请核对身份和完整授权历史。";
+"CLIENT_IDENTITY_EXPIRED" = "设备证书或房间签名授权已到期，已停止通话。请由授权者续期。";
+
+"IDENTITY_BLACKLISTED" = "此账号或设备已被永久撤销，恢复文件不能解除封禁。";
+"REGISTRATION_PENDING" = "注册申请正在等待管理员批准。";
+"REGISTRATION_REJECTED" = "注册申请已被拒绝或删除，请重新申请。";
+"IDENTITY_CONFLICT" = "此账号已绑定不同的根身份，请使用已有设备授权或正确恢复文件。";
+"CURRENT_DEVICE" = "不能自助撤销当前设备。";
+"LAST_DEVICE" = "必须至少保留一台有效设备。";
+"SOCIAL_CONFLICT" = "请先同步最新好友状态后重试。";
+"CLIENT_AUTHORIZATION_STALE" = "授权状态缺失或已过期，聊天已停止。";
+
+"DEVICE_PAIRING_INVALID" = "设备配对已过期、取消或发生冲突，请重新生成二维码。";

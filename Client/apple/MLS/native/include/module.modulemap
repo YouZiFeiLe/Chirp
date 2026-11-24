@@ -1,0 +1,4 @@
+module ChirpMLSNative {
+    header "ChirpMLSNative.h"
+    export *
+}

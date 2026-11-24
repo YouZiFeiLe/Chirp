@@ -1,0 +1,94 @@
+# 源码构建与已有部署脚本使用此文件。Docker Hub 成品镜像的一键启动文件在仓库根目录 compose.yaml。
+name: chirp
+services:
+  app:
+    image: ${CHIRP_IMAGE:-chirp-server:0.14.0}
+    platform: linux/amd64
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      target: app
+    environment:
+      CHIRP_DATABASE_PATH: /data/chirp.db
+      CHIRP_ATTACHMENT_PATH: /data/attachments
+      CHIRP_AUTHORIZATION_DATABASE_PATH: /authorization/authorization.db
+      CHIRP_AUTHORIZATION_KEY_FILE: /run/secrets/authorization-key
+      CHIRP_LISTEN_ADDR: 0.0.0.0:18115
+      CHIRP_PUBLIC_ORIGIN: ${CHIRP_PUBLIC_ORIGIN:-https://chirp.youzifeile.cn}
+      CHIRP_LOG_LEVEL: ${CHIRP_LOG_LEVEL:-info}
+      CHIRP_LOG_SERVER_ENABLED: ${CHIRP_LOG_SERVER_ENABLED:-false}
+      CHIRP_LOG_SERVER_URL: ${CHIRP_LOG_SERVER_URL:-}
+      CHIRP_TOKEN_TTL: ${CHIRP_TOKEN_TTL:-5m}
+      CHIRP_GROUP_ROTATION: ${CHIRP_GROUP_ROTATION:-60s}
+      LIVEKIT_HTTP_URL: http://livekit:7880
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:-chirp}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:?请填写 LiveKit 签名凭据}
+    secrets:
+      - source: authorization-key
+        target: authorization-key
+    volumes:
+      - type: bind
+        source: ./data
+        target: /data
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./log
+        target: /app/log
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./authorization-data
+        target: /authorization
+        bind:
+          create_host_path: false
+    # 同机原生 Nginx 使用回环上游。异机或容器反代的接入方式见 docs/server-operations.md。
+    ports:
+      - "${CHIRP_HTTP_PUBLISH_IP:-127.0.0.1}:18115:18115/tcp"
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 256
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=32m,mode=1777
+    stop_grace_period: 20s
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/chirp", "healthcheck"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    logging:
+      # 应用自行管理日期日志或直送 VictoriaLogs，Docker 不再重复落盘。
+      driver: none
+
+  livekit:
+    image: ${CHIRP_LIVEKIT_IMAGE:-livekit/livekit-server:v1.13.11}
+    platform: linux/amd64
+    user: "65534:65534"
+    # LiveKit 1.13.11 的 LIVEKIT_KEYS 接收 YAML key: secret；与 app 使用同一来源。
+    environment:
+      LIVEKIT_KEYS: "${LIVEKIT_API_KEY:-chirp}: ${LIVEKIT_API_SECRET:?请填写 LiveKit 签名凭据}"
+    ports:
+      - "${CHIRP_HTTP_PUBLISH_IP:-127.0.0.1}:7880:7880/tcp"
+      - "0.0.0.0:7882:7882/udp"
+    command: ["--config", "/etc/livekit.yaml"]
+    volumes:
+      - ./livekit.yaml:/etc/livekit.yaml:ro
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 512
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=32m,mode=1777
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+secrets:
+  authorization-key:
+    file: ./secrets/authorization-key

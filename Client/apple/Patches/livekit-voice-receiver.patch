@@ -1,0 +1,271 @@
+--- a/Package.swift
++++ b/Package.swift
+@@ -42,6 +42,15 @@
+             dependencies: ["CLiveKitProto"],
+         ),
+         .target(
++            name: "ChirpVoiceReceiver",
++            dependencies: [.product(name: "LiveKitWebRTC", package: "webrtc-xcframework")],
++            exclude: ["webrtc-headers"],
++            publicHeadersPath: "include",
++            // Chromium libc++ ABI v2 passes unique_ptr frames by value at the virtual callback boundary.
++            cxxSettings: [.headerSearchPath("webrtc-headers"), .define("WEBRTC_MAC"), .define("WEBRTC_POSIX"),
++                          .define("NDEBUG"), .define("_LIBCPP_ABI_ENABLE_UNIQUE_PTR_TRIVIAL_ABI")],
++        ),
++        .target(
+             name: "LKObjCHelpers",
+             publicHeadersPath: "include",
+         ),
+@@ -53,6 +62,7 @@
+                 "LiveKitNanopb",
+                 "CLiveKitProto",
+                 "LKObjCHelpers",
++                "ChirpVoiceReceiver",
+             ],
+             exclude: [
+                 "Broadcast/NOTICE",
+@@ -103,4 +113,5 @@
+         ),
+     ],
+     swiftLanguageModes: [.v5, .v6],
++    cxxLanguageStandard: .cxx20,
+ )
+--- a/Package@swift-6.2.swift
++++ b/Package@swift-6.2.swift
+@@ -43,6 +43,15 @@
+             dependencies: ["CLiveKitProto"],
+         ),
+         .target(
++            name: "ChirpVoiceReceiver",
++            dependencies: [.product(name: "LiveKitWebRTC", package: "webrtc-xcframework")],
++            exclude: ["webrtc-headers"],
++            publicHeadersPath: "include",
++            // Chromium libc++ ABI v2 passes unique_ptr frames by value at the virtual callback boundary.
++            cxxSettings: [.headerSearchPath("webrtc-headers"), .define("WEBRTC_MAC"), .define("WEBRTC_POSIX"),
++                          .define("NDEBUG"), .define("_LIBCPP_ABI_ENABLE_UNIQUE_PTR_TRIVIAL_ABI")],
++        ),
++        .target(
+             name: "LKObjCHelpers",
+             publicHeadersPath: "include",
+         ),
+@@ -54,6 +63,7 @@
+                 "LiveKitNanopb",
+                 "CLiveKitProto",
+                 "LKObjCHelpers",
++                "ChirpVoiceReceiver",
+             ],
+             exclude: [
+                 "Broadcast/NOTICE",
+@@ -104,4 +114,5 @@
+         ),
+     ],
+     swiftLanguageModes: [.v5, .v6],
++    cxxLanguageStandard: .cxx20,
+ )
+--- a/Sources/LiveKit/E2EE/KeyProvider.swift
++++ b/Sources/LiveKit/E2EE/KeyProvider.swift
+@@ -109,6 +109,7 @@
+     // MARK: - Internal
+ 
+     let rtcKeyProvider: LKRTCFrameCryptorKeyProvider
++    let chirpVoice: ChirpVoiceKeys?
+ 
+     // MARK: - State
+ 
+@@ -126,6 +127,7 @@
+     // MARK: Init
+ 
+     public init(isSharedKey: Bool, sharedKey: String? = nil) {
++        chirpVoice = nil
+         options = KeyProviderOptions(sharedKey: isSharedKey)
+         rtcKeyProvider = LKRTCFrameCryptorKeyProvider(ratchetSalt: options.ratchetSalt,
+                                                       ratchetWindowSize: options.ratchetWindowSize,
+@@ -141,7 +143,19 @@
+         }
+     }
+ 
+-    public init(options: KeyProviderOptions = KeyProviderOptions()) {
++    public convenience init(options: KeyProviderOptions = KeyProviderOptions()) {
++        self.init(options: options, voice: nil)
++    }
++
++    /// Per-sender MLS input, two alternating slots, HKDF-SHA256 and encrypted Opus only.
++    @nonobjc public convenience init(chirpAudioAuthorization: @escaping @Sendable () -> Bool) {
++        let options = KeyProviderOptions(sharedKey: false, ratchetWindowSize: 0, uncryptedMagicBytes: Data(),
++                                        keyRingSize: 2, discardFrameWhenCryptorNotReady: true, keyDerivationAlgorithm: .hkdf)
++        self.init(options: options, voice: ChirpVoiceKeys(salt: options.ratchetSalt, authorized: chirpAudioAuthorization))
++    }
++
++    private init(options: KeyProviderOptions, voice: ChirpVoiceKeys?) {
++        chirpVoice = voice
+         self.options = options
+         rtcKeyProvider = LKRTCFrameCryptorKeyProvider(ratchetSalt: options.ratchetSalt,
+                                                       ratchetWindowSize: options.ratchetWindowSize,
+@@ -178,6 +192,7 @@
+             } else {
+                 guard let participantId else { return false }
+                 rtcKeyProvider.setKey(keyData, with: targetIndex, forParticipant: participantId)
++                chirpVoice?.install(keyData, for: participantId, index: targetIndex)
+                 state.chirpKeySlots[participantId, default: []].insert(targetIndex)
+                 state.chirpSlotGenerations[targetIndex, default: 0] &+= 1
+             }
+@@ -198,6 +213,7 @@
+             state.chirpSlotGenerations[index, default: 0] &+= 1
+             for (identity, key) in keys {
+                 rtcKeyProvider.setKey(key, with: index, forParticipant: identity)
++                chirpVoice?.install(key, for: identity, index: index, staged: true)
+                 state.chirpKeySlots[identity, default: []].insert(index)
+             }
+             return true
+@@ -214,10 +230,20 @@
+         }
+     }
+ 
++    /// Grant playout only for a lease matching the selected sending epoch.
++    /// A late response for the previous epoch cannot unlock a staged slot.
++    public func chirpAuthorizeVoiceKeyIndex(_ index: Int32) {
++        _state.read { state in
++            guard !state.chirpRetired, index == state.currentKeyIndex else { return }
++            chirpVoice?.activate(index)
++        }
++    }
++
+     @nonobjc public func chirpRetireKeyIndex(_ index: Int32, generation: UInt64? = nil) -> Bool {
+         _state.mutate { state in
+             guard !state.chirpRetired, !options.sharedKey, index >= 0, index < options.keyRingSize,
+                   index != state.currentKeyIndex, generation.map({ $0 == state.chirpSlotGenerations[index] }) ?? true else { return false }
++            chirpVoice?.retire(index)
+             for identity in Array(state.chirpKeySlots.keys) where state.chirpKeySlots[identity]?.contains(index) == true {
+                 var tombstone = SymmetricKey(size: .bits256).withUnsafeBytes { Data($0) }
+                 rtcKeyProvider.setKey(tombstone, with: index, forParticipant: identity)
+@@ -232,7 +258,11 @@
+     /// A slot reused for a newer candidate has a different material generation.
+     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+     @nonobjc public func chirpExpireKeyIndex(_ index: Int32, at deadline: ContinuousClock.Instant) {
+-        guard let generation = _state.read({ $0.chirpSlotGenerations[index] }) else { return }
++        guard let generation = _state.read({ state -> UInt64? in
++            guard index != state.currentKeyIndex, let generation = state.chirpSlotGenerations[index] else { return nil }
++            chirpVoice?.expire(index) { ContinuousClock.now < deadline }
++            return generation
++        }) else { return }
+         Task.detached { [self] in
+             while ContinuousClock.now < deadline {
+                 try? await Task.sleep(for: .milliseconds(20))
+@@ -247,6 +277,7 @@
+         _state.mutate { state in
+             guard !state.chirpRetired, !options.sharedKey else { return }
+             state.chirpRetired = true
++            chirpVoice?.retire()
+             for (identity, indices) in state.chirpKeySlots {
+                 for index in indices {
+                     var tombstone = SymmetricKey(size: .bits256).withUnsafeBytes { Data($0) }
+--- a/Sources/LiveKit/E2EE/E2EEManager.swift
++++ b/Sources/LiveKit/E2EE/E2EEManager.swift
+@@ -18,6 +18,7 @@
+ import Foundation
+ 
+ internal import LiveKitWebRTC
++internal import ChirpVoiceReceiver
+ 
+ @objcMembers
+ public class E2EEManager: NSObject, @unchecked Sendable, ObservableObject, Loggable {
+@@ -94,6 +95,7 @@
+     typealias CryptorKey = [Participant.Identity: Track.Sid]
+ 
+     private struct ChirpBinding: Equatable, Sendable {
++        let publication: TrackPublication
+         let id: ObjectIdentifier
+         let sender: RTCSender?
+         let receiver: RTCReceiver?
+@@ -198,8 +200,7 @@
+             guard publication.track?.trackState == .started else { return }
+             await addRtpReceiver(publication: publication, participantIdentity: participantIdentity)
+         case let .detach(key, publication):
+-            guard let cryptor = _state.frameCryptors[key],
+-                  _state.trackPublications[cryptor] === publication,
++            guard _state.chirpBindings[key]?.publication === publication,
+                   let track = _state.chirpTracks[key] else { return }
+             // A delayed unsubscribe/unpublish callback cannot remove an
+             // already-active binding and cause its frame counter to reset.
+@@ -272,9 +273,10 @@
+ 
+     private func detachCryptor(_ key: CryptorKey) {
+         _state.mutate {
+-            guard let frameCryptor = $0.frameCryptors.removeValue(forKey: key) else { return }
+-            frameCryptor.delegate = nil
+-            $0.trackPublications.removeValue(forKey: frameCryptor)
++            if let frameCryptor = $0.frameCryptors.removeValue(forKey: key) {
++                frameCryptor.delegate = nil
++                $0.trackPublications.removeValue(forKey: frameCryptor)
++            }
+             $0.chirpTracks.removeValue(forKey: key)
+             $0.chirpBindings.removeValue(forKey: key)
+         }
+@@ -381,7 +383,7 @@
+         let key: CryptorKey = [participantIdentity: publication.sid]
+         guard let sender = track._state.rtpSender else { return false }
+         return await RTC.run {
+-            let binding = ChirpBinding(id: ObjectIdentifier(sender.raw), sender: sender, receiver: nil)
++            let binding = ChirpBinding(publication: publication, id: ObjectIdentifier(sender.raw), sender: sender, receiver: nil)
+             if _state.frameCryptors[key] != nil {
+                 return _state.read { $0.chirpTracks[key] === track && $0.chirpBindings[key] == binding }
+             }
+@@ -403,9 +405,38 @@
+               let receiver = track._state.rtpReceiver else { return false }
+         let key: CryptorKey = [participantIdentity: publication.sid]
+         return await RTC.run {
+-            let binding = ChirpBinding(id: ObjectIdentifier(receiver.raw), sender: nil, receiver: receiver)
+-            if _state.read({ $0.frameCryptors[key] != nil && $0.chirpTracks[key] === track && $0.chirpBindings[key] == binding }) { return true }
++            let voice = keyProvider.chirpVoice
++            if voice != nil {
++                guard track is RemoteAudioTrack, publication.kind == .audio, publication.source == .microphone else { return false }
++            }
++            let binding = ChirpBinding(publication: publication, id: ObjectIdentifier(receiver.raw), sender: nil, receiver: receiver)
++            if _state.read({ $0.chirpTracks[key] === track && $0.chirpBindings[key] == binding }) { return true }
+             detachCryptor(key)
++            if let voice {
++                let identity = participantIdentity.stringValue
++                track._state.mutate { $0.chirpPlayoutAllowed = { voice.permitsPlayout(for: identity) } }
++                let last = StateSync<E2EEState?>(nil)
++                guard ChirpInstallVoiceReceiver(receiver.raw, { @Sendable [weak self, weak publication] frame in
++                    let result = voice.open(frame, from: identity)
++                    let state: E2EEState
++                    let plaintext: Data?
++                    switch result {
++                    case let .audio(data): state = .ok; plaintext = data
++                    case .invalid: state = .decryption_failed; plaintext = nil
++                    case .duplicate, .inactive: return nil
++                    }
++                    let changed = last.mutate { previous in
++                        defer { previous = state }
++                        return previous != state
++                    }
++                    if changed, let room = self?._room, let publication {
++                        room.delegates.notify { $0.room?(room, trackPublication: publication, didUpdateE2EEState: state) }
++                    }
++                    return plaintext
++                }) else { return false }
++                _state.mutate { $0.chirpTracks[key] = track; $0.chirpBindings[key] = binding }
++                return true
++            }
+             guard let frameCryptor = LKRTCFrameCryptor(factory: RTC.peerConnectionFactory,
+                                                        rtpReceiver: receiver.raw,
+                                                        participantId: participantIdentity.stringValue,
+--- a/Sources/LiveKit/Track/Track.swift
++++ b/Sources/LiveKit/Track/Track.swift
+@@ -101,6 +101,7 @@
+         var dimensions: Dimensions?
+         var videoFrame: VideoFrame?
+         var trackState: TrackState = .stopped
++        var chirpPlayoutAllowed: (@Sendable () -> Bool)?
+         var isMuted: Bool = false
+         var statistics: TrackStatistics?
+         var simulcastStatistics: [VideoCodec: TrackStatistics] = [:]
+@@ -260,6 +261,7 @@
+     @discardableResult
+     @RTC
+     func enable() async throws -> Bool {
++        guard _state.chirpPlayoutAllowed?() ?? true else { return false }
+         guard !mediaTrack.raw.isEnabled else { return false }
+         mediaTrack.raw.isEnabled = true
+         return true

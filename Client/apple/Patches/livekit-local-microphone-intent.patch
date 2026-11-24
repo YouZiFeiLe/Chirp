@@ -1,0 +1,28 @@
+--- a/Sources/LiveKit/Core/Room+SignalClientDelegate.swift
++++ b/Sources/LiveKit/Core/Room+SignalClientDelegate.swift
+@@ -215,12 +215,13 @@
+             return
+         }
+ 
++        // The signaling endpoint is not an authority for local capture consent.
++        guard muted else {
++            log("Ignored remote request to enable local capture", .warning)
++            return
++        }
+         do {
+-            if muted {
+-                try await publication.mute()
+-            } else {
+-                try await publication.unmute()
+-            }
++            try await publication.mute()
+         } catch {
+             log("Failed to update mute for publication, error: \(error)", .error)
+         }
+--- /dev/null
++++ b/Sources/LiveKit/Core/Room+ChirpMicrophoneIntent.swift
+@@ -0,0 +1,4 @@
++public extension Room {
++    /// Remote signaling may mute capture; only the application may enable it.
++    static var chirpLocalMicrophoneIntent: Bool { true }
++}

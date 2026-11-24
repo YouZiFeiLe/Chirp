@@ -1,0 +1,194 @@
+{
+  "name": "Chirp — Together",
+  "version": 2,
+  "description": "Platform-neutral reference. Colors are sRGB hex; dimensions are logical pt/dp/DIP/CSS px, not physical pixels. Follow system appearance.",
+  "color": {
+    "canvas": {
+      "light": "#F4F6F2",
+      "dark": "#101B17"
+    },
+    "surface": {
+      "light": "#FFFFFF",
+      "dark": "#192A23"
+    },
+    "surfaceSubtle": {
+      "light": "#E8F0E7",
+      "dark": "#223A2E"
+    },
+    "chatCanvas": {
+      "light": "#EDF3ED",
+      "dark": "#14231D"
+    },
+    "chatInput": {
+      "light": "#E2EBE0",
+      "dark": "#223A2E"
+    },
+    "border": {
+      "light": "#D5DED3",
+      "dark": "#365044"
+    },
+    "ink": {
+      "light": "#1C3028",
+      "dark": "#EDF4EB"
+    },
+    "secondary": {
+      "light": "#5C6D62",
+      "dark": "#AEC2B4"
+    },
+    "accent": {
+      "light": "#246448",
+      "dark": "#A9DAB5"
+    },
+    "onAccent": {
+      "light": "#FFFFFF",
+      "dark": "#123721"
+    },
+    "danger": {
+      "light": "#AF403D",
+      "dark": "#FFB4A8"
+    },
+    "warning": {
+      "light": "#805820",
+      "dark": "#E3C08C"
+    },
+    "nativeAccent": {
+      "light": "#246448",
+      "dark": "#477C5C"
+    },
+    "hero": {
+      "light": "#E2EEE2",
+      "dark": "#213C2D"
+    },
+    "onDanger": {
+      "light": "#FFFFFF",
+      "dark": "#44211D"
+    }
+  },
+  "avatar": [
+    {
+      "fill": {
+        "light": "#E4EBDE",
+        "dark": "#334530"
+      },
+      "ink": {
+        "light": "#47603E",
+        "dark": "#BDD0B2"
+      }
+    },
+    {
+      "fill": {
+        "light": "#EBE5DD",
+        "dark": "#463C31"
+      },
+      "ink": {
+        "light": "#77604A",
+        "dark": "#D6C2AA"
+      }
+    },
+    {
+      "fill": {
+        "light": "#E5E7ED",
+        "dark": "#363B4B"
+      },
+      "ink": {
+        "light": "#56617B",
+        "dark": "#BDC6DE"
+      }
+    },
+    {
+      "fill": {
+        "light": "#ECE3E2",
+        "dark": "#4A3534"
+      },
+      "ink": {
+        "light": "#815A55",
+        "dark": "#DCBDB7"
+      }
+    }
+  ],
+  "spacing": {
+    "xs": 4,
+    "sm": 8,
+    "md": 12,
+    "lg": 16,
+    "xl": 24,
+    "xxl": 32,
+    "section": 40
+  },
+  "radius": {
+    "control": 14,
+    "card": 24,
+    "hero": 32,
+    "avatar": "50%",
+    "callAction": "capsule"
+  },
+  "layout": {
+    "desktop": {
+      "minimumWindow": [
+        900,
+        620
+      ],
+      "defaultWindow": [
+        1120,
+        780
+      ],
+      "sidebar": {
+        "min": 220,
+        "ideal": 252,
+        "max": 300
+      },
+      "chat": {
+        "min": 280,
+        "ideal": 320,
+        "max": 400
+      },
+      "contentMaxWidth": 800,
+      "contentInset": 32
+    },
+    "mobile": {
+      "contentInset": 24,
+      "contentMaxWidth": 640,
+      "roomCardGap": 12,
+      "roomCardInset": 20
+    },
+    "memberGrid": {
+      "minimumColumn": 132,
+      "accessibilityMinimumColumn": 240,
+      "gap": 12
+    }
+  },
+  "type": {
+    "family": "Platform system sans serif; native Chinese fallback",
+    "roomTitle": "largeTitle / rounded / semibold",
+    "sectionTitle": "headline",
+    "body": "body",
+    "supporting": "subheadline",
+    "metadata": "caption",
+    "emphasis": "medium or semibold; use bold only for wordmark"
+  },
+  "interaction": {
+    "minimumTouchTarget": 44,
+    "androidMinimumTouchTarget": 48,
+    "hover": "native",
+    "focus": "native visible keyboard focus",
+    "motion": "160–220ms feedback; native transitions; respect reduced motion; no decorative looping animation"
+  },
+  "avatarIndex": "Use stable member ID: take portion before .login_ for a media identity, then sum Unicode scalar values modulo 4. No platform-randomized hash.",
+  "materials": {
+    "apple": "Native sidebar, toolbars, safeAreaBar, glass/glassProminent call actions",
+    "android": "Native navigation, bottom bar and surfaces with the shared semantic palette",
+    "windows": "Native navigation, toolbar and focus; shared palette on content surfaces"
+  },
+  "web": {
+    "authenticationMaxWidth": 1120,
+    "sidebarWidth": 252,
+    "minimumTouchTarget": 44,
+    "type": {
+      "body": 16,
+      "supporting": 14,
+      "metadata": 12
+    },
+    "focus": "2px accent outline with 4px offset",
+    "surfaces": "porcelain canvas, paper cards, pale green hero"
+  }
+}

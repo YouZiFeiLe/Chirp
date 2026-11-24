@@ -1,0 +1,6 @@
+"NSMicrophoneUsageDescription" = "Make encrypted voice calls with your friends.";
+"NSCameraUsageDescription" = "Use the camera only to scan device authorization QR codes. Frames are processed on this device and are never uploaded or sent. You can import a QR code image or use a recovery file.";
+"NSLocalNetworkUsageDescription" = "Connect to your self-hosted voice server.";
+"NSPhotoLibraryAddUsageDescription" = "Save your device authorization QR code to Photos so you can import it on another device.";
+
+"NSFaceIDUsageDescription" = "Verify your identity before authorizing a new device. You can also use your device passcode.";

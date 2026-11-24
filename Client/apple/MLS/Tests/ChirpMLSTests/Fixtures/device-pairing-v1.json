@@ -1,0 +1,29 @@
+{
+  "action": {
+    "request_id": "95ntCkmuHLj4sa5f1RIjdkLyD3fo92MxS9JOzwalQjM=",
+    "action": "reveal",
+    "issuer": {
+      "account_key": "",
+      "certificates": []
+    },
+    "payload": "{\"kind\":\"Key\",\"key\":\"ephemeral-public-key\"}",
+    "nonce": "lHOvsP4aYV/DJ21GkVFaG8YMO2h553X7JTH4VZwLrMU=",
+    "created_at": 1700000001,
+    "signature": "xkTHDPPXpnj41jb4HCLa20mpK/tCVuGSIgOTZe2BkvQb1pg7HeNwCiblYCy4DMbNYIwuvVQtiGV49GB50Z0sBw=="
+  },
+  "action_message": "AAAAHkNoaXJwIGRldmljZSBwYWlyaW5nIGFjdGlvbiB2MQAAACw5NW50Q2ttdUhMajRzYTVmMVJJamRrTHlEM2ZvOTJNeFM5Sk96d2FsUWpNPQAAAAZyZXZlYWwAAAAsQ3lReGM4ZlBTbjJoMGw0NFVjVXQyZW83QVhaVzRzRUxUWlRpekQveHkvbz0AAAAsL0ZHeFdMTkhDVHZJeW16UnBFWmNWblhINU1weVNhTFZLNnFzZUE5eXVQZz0AAAAsbEhPdnNQNGFZVi9ESjIxR2tWRmFHOFlNTzJoNTUzWDdKVEg0Vlp3THJNVT0AAAAKMTcwMDAwMDAwMQ==",
+  "context": "F5gSGU5uZOP3zQ6T1ZspgYI2c/P44iqMKC/ABT40RDo=",
+  "request": {
+    "version": 1,
+    "origin": "https://fixture.test:443",
+    "account_id": "member_pairing_vector",
+    "account_key": "hxPdfTQBFuM3xJzs0LZ/Oyl6sxB05ehHQksJ14Y54Yg=",
+    "device_key": "E4vu+vYZ9/Mbjvi0gyXDe7UzT1YkE6WRJ/LihCdSmo8=",
+    "nonce": "tDCOViQ/jOnJ51sKy65LEh/3j8ke/wze4UuCVJj1/aE=",
+    "expires_at": 1700000297,
+    "commitment": "LUuDyLZtdq8yur/TkrPO/5Jbi7OB7WFUQFWaAMP5nMw=",
+    "signature": "cqUKYZKIEj+HUn+u21bQxcLSRUgyxcM+ZsMv+sKDdsByJgRZE6Cq6ViGMx9AIKLovCdbAjq5OVHoxxQuHc1sDg=="
+  },
+  "request_digest": "95ntCkmuHLj4sa5f1RIjdkLyD3fo92MxS9JOzwalQjM=",
+  "request_message": "AAAAH0NoaXJwIGRldmljZSBwYWlyaW5nIHJlcXVlc3QgdjEAAAAsRjVnU0dVNXVaT1AzelE2VDFac3BnWUkyYy9QNDRpcU1LQy9BQlQ0MFJEbz0AAAAsTFV1RHlMWnRkcTh5dXIvVGtyUE8vNUpiaTdPQjdXRlVRRldhQU1QNW5Ndz0="
+}

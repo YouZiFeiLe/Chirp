@@ -1,0 +1,640 @@
+--- a/io/livekit/android/e2ee/E2EEManager.kt
++++ b/io/livekit/android/e2ee/E2EEManager.kt
+@@ -51,6 +51,19 @@
+     private var room: Room? = null
+     private val frameCryptors = mutableMapOf<Pair<String, Participant.Identity>, FrameCryptor>()
+     private var algorithm: FrameCryptorAlgorithm = FrameCryptorAlgorithm.AES_GCM
++    /** Keep existing RTP cryptors and their counters across a key-slot switch. */
++    @Synchronized
++    fun chirpSwitchKey(index: Int) {
++        require(index in 0..1 && enabled)
++        frameCryptors.values.forEach { it.keyIndex = index }
++    }
++    /** Confirm the sender attached by onTrackPublished is using the active key before opening capture. */
++    @Synchronized
++    fun chirpSenderReady(trackId: String, participant: Participant.Identity): Boolean {
++        val cryptor = frameCryptors[trackId to participant] ?: return false
++        return enabled && cryptor.isEnabled && cryptor.keyIndex == keyProvider.getLatestKeyIndex(participant.value)
++    }
++
+     private lateinit var emitEvent: (roomEvent: RoomEvent) -> Unit?
+ 
+     internal var dataPacketCryptorManager: DataPacketCryptorManager = dataPacketCryptorManagerFactory.create(keyProvider)
+@@ -115,6 +128,10 @@
+     }
+ 
+     fun addSubscribedTrack(track: Track, publication: TrackPublication, participant: RemoteParticipant, room: Room) {
++        if (track is RemoteAudioTrack && keyProvider is ChirpDataGate) {
++            keyProvider.installVoiceReceiver(requireNotNull(track.receiver), requireNotNull(participant.identity).value)
++            return
++        }
+         val rtpReceiver: RtpReceiver? = when (publication.track!!) {
+             is RemoteAudioTrack -> (publication.track!! as RemoteAudioTrack).receiver
+             is RemoteVideoTrack -> (publication.track!! as RemoteVideoTrack).receiver
+@@ -137,6 +154,7 @@
+         }
+     }
+ 
++    @Synchronized
+     fun removeSubscribedTrack(track: Track, publication: TrackPublication, participant: RemoteParticipant, room: Room) {
+         val trackId = publication.sid
+         val participantId = participant.identity
+@@ -157,6 +175,9 @@
+             }
+         } ?: throw IllegalArgumentException("rtpSender is null")
+ 
++        if (track is LocalAudioTrack && keyProvider is ChirpDataGate) {
++            keyProvider.installVoiceSender(rtpSender, requireNotNull(participant.identity).value)
++        }
+         val frameCryptor = addRtpSender(rtpSender, participant.identity!!, publication.sid, publication.track!!.kind.name.lowercase())
+         frameCryptor.setObserver { trackId, state ->
+             LKLog.i { "Sender::onFrameCryptionStateChanged: $trackId, state:  $state" }
+@@ -172,6 +193,7 @@
+         }
+     }
+ 
++    @Synchronized
+     fun removePublishedTrack(track: Track, publication: TrackPublication, participant: LocalParticipant, room: Room) {
+         val trackId = publication.sid
+         val participantId = participant.identity
+@@ -196,6 +218,7 @@
+         }
+     }
+ 
++    @Synchronized
+     private fun addRtpSender(sender: RtpSender, participantId: Participant.Identity, trackId: String, kind: String): FrameCryptor {
+         val frameCryptor = FrameCryptorFactory.createFrameCryptorForRtpSender(
+             peerConnectionFactory,
+@@ -211,6 +234,7 @@
+         return frameCryptor
+     }
+ 
++    @Synchronized
+     private fun addRtpReceiver(receiver: RtpReceiver, participantId: Participant.Identity, trackId: String, kind: String): FrameCryptor {
+         val frameCryptor = FrameCryptorFactory.createFrameCryptorForRtpReceiver(
+             peerConnectionFactory,
+@@ -242,6 +266,7 @@
+         LKLog.d { "ratchetSharedKey: newKey: $newKey" }
+     }
+ 
++    @Synchronized
+     internal fun cleanup() {
+         for (frameCryptor in frameCryptors.values) {
+             frameCryptor.dispose()
+@@ -250,6 +275,7 @@
+     }
+ 
+     internal fun dispose() {
++        cleanup()
+         dataPacketCryptorManager.dispose()
+     }
+ 
+--- a/io/livekit/android/room/RTCEngine.kt
++++ b/io/livekit/android/room/RTCEngine.kt
+@@ -826,6 +826,9 @@
+ 
+     @CheckResult
+     internal suspend fun sendData(dataPacket: LivekitModels.DataPacket): Result<Unit> {
++        val gate = e2EEManager?.keyProvider as? io.livekit.android.e2ee.ChirpDataGate
++            ?: return Result.failure(IllegalStateException("Chirp encryption is required"))
++        val epoch = gate.dataEpoch
+         try {
+             ensurePublisherConnected(dataPacket.kind)
+         } catch (e: Exception) {
+@@ -835,29 +838,24 @@
+ 
+         fun sendDataImpl(dataPacket: LivekitModels.DataPacket): Result<Unit> {
+             try {
+-                // Redeclare to make variable
+-                var dataPacket = dataPacket
+-
+-                val e2EEManager = e2EEManager
+-                val dataEncryptionEnabled = e2EEManager?.isDataChannelEncryptionEnabled() ?: false
+-                if (dataEncryptionEnabled && e2EEManager != null) {
+-                    val encryptedPacketPayload = dataPacket.asEncryptedPacketPayload()
+-                    if (encryptedPacketPayload != null) {
+-                        val encryptedData = e2EEManager.encrypt(encryptedPacketPayload.toByteArray())
+-                        if (encryptedData != null) {
+-                            dataPacket = with(dataPacket.toBuilder()) {
+-                                encryptedPacket = with(LivekitModels.EncryptedPacket.newBuilder()) {
+-                                    encryptedValue = ByteString.copyFrom(encryptedData.payload)
+-                                    iv = ByteString.copyFrom(encryptedData.iv)
+-                                    keyIndex = encryptedData.keyIndex
+-                                    encryptionType = LivekitModels.Encryption.Type.GCM
+-                                    build()
+-                                }
+-                                build()
+-                            }
+-                        }
+-                    }
+-                }
++                if (!gate.maySendData(epoch)) {
++                    return Result.failure(io.livekit.android.e2ee.ChirpDataKeyNotReady())
++                }
++                val payload = dataPacket.asEncryptedPacketPayload()
++                    ?: return Result.failure(IllegalStateException("Unsupported Chirp packet"))
++                val encryptedData = e2EEManager?.takeIf { it.isDataChannelEncryptionEnabled() }
++                    ?.encrypt(payload.toByteArray())
++                    ?: return Result.failure(IllegalStateException("Chirp encryption failed"))
++                if (encryptedData.keyIndex != (epoch and 1L).toInt()) {
++                    return Result.failure(io.livekit.android.e2ee.ChirpDataKeyNotReady())
++                }
++                var dataPacket = dataPacket.toBuilder().setEncryptedPacket(
++                    LivekitModels.EncryptedPacket.newBuilder()
++                        .setEncryptedValue(ByteString.copyFrom(encryptedData.payload))
++                        .setIv(ByteString.copyFrom(encryptedData.iv))
++                        .setKeyIndex(encryptedData.keyIndex)
++                        .setEncryptionType(LivekitModels.Encryption.Type.GCM),
++                ).build()
+ 
+                 val isReliable = dataPacket.kind == LivekitModels.DataPacket.Kind.RELIABLE
+                 if (isReliable) {
+@@ -872,11 +870,6 @@
+                     return Result.failure(IllegalArgumentException("packet size (${packetBytes.size}) exceeds the max size (${MAX_DATA_PACKET_SIZE})"))
+                 }
+ 
+-                if (isReliable && this.connectionState == ConnectionState.RECONNECTING) {
+-                    reliableMessageBuffer.queue(DataPacketItem(ByteBuffer.wrap(packetBytes), dataPacket.sequence))
+-                    reliableDataSequence++
+-                    return Result.success(Unit)
+-                }
+                 val buf = DataChannel.Buffer(
+                     ByteBuffer.wrap(packetBytes),
+                     true,
+@@ -884,6 +877,13 @@
+                 val channel = dataChannelForKind(dataPacket.kind)
+                     ?: throw RoomException.ConnectException("channel not established for ${dataPacket.kind.name}")
+ 
++                if (isClosed || reconnectingJob?.isActive == true ||
++                    !connectionState.chirpPublisherReady(client.isConnected, channel.state())) {
++                    return Result.failure(IllegalStateException("Chirp data channel is unavailable"))
++                }
++                if (!gate.maySendData(epoch)) {
++                    return Result.failure(io.livekit.android.e2ee.ChirpDataKeyNotReady())
++                }
+                 if (!channel.send(buf)) {
+                     return Result.failure(
+                         RoomException.ConnectException("failed to send data packet for ${dataPacket.kind.name}"),
+@@ -891,9 +891,6 @@
+                 }
+ 
+                 if (isReliable) {
+-                    // Wrap a fresh ByteBuffer so the queued item's position stays at 0; the
+-                    // ByteBuffer just sent has been drained by DataChannel.send.
+-                    reliableMessageBuffer.queue(DataPacketItem(ByteBuffer.wrap(packetBytes), dataPacket.sequence))
+                     reliableDataSequence++
+                 }
+             } catch (e: Exception) {
+@@ -1097,74 +1094,15 @@
+         serverResponse: Either<JoinResponse, ReconnectResponse>,
+         connectOptions: ConnectOptions,
+     ): RTCConfiguration {
+-        // Convert protobuf ice servers
+-        val serverIceServers = run {
+-            val servers = mutableListOf<PeerConnection.IceServer>()
+-            val responseServers = when (serverResponse) {
+-                is Either.Left -> serverResponse.value.iceServersList
+-                is Either.Right -> serverResponse.value.iceServersList
+-            }
+-            for (serverInfo in responseServers) {
+-                servers.add(serverInfo.toWebrtc())
+-            }
+-
+-            if (servers.isEmpty()) {
+-                servers.addAll(SignalClient.DEFAULT_ICE_SERVERS)
+-            }
+-            servers
+-        }
+-
+-        val rtcConfig = connectOptions.rtcConfig?.copy()?.apply {
+-            val mergedServers = iceServers.toMutableList()
+-            connectOptions.iceServers?.forEach { server ->
+-                if (!mergedServers.contains(server)) {
+-                    mergedServers.add(server)
+-                }
+-            }
+-
+-            // Only use server-provided servers if user doesn't provide any.
+-            if (mergedServers.isEmpty()) {
+-                mergedServers.addAll(serverIceServers)
+-            }
+-
+-            iceServers = mergedServers
++        // Only the authenticated self-hosted SFU's UDP candidates are used.
++        val rtcConfig = (connectOptions.rtcConfig?.copy() ?: RTCConfiguration(emptyList())).apply {
++            cryptoOptions = io.livekit.android.e2ee.chirpVoiceCryptoOptions()
++            iceServers = emptyList()
++            tcpCandidatePolicy = PeerConnection.TcpCandidatePolicy.DISABLED
++            iceTransportsType = PeerConnection.IceTransportsType.ALL
+             sdpSemantics = PeerConnection.SdpSemantics.UNIFIED_PLAN
+-            continualGatheringPolicy =
+-                PeerConnection.ContinualGatheringPolicy.GATHER_CONTINUALLY
+-        }
+-            ?: RTCConfiguration(serverIceServers).apply {
+-                sdpSemantics = PeerConnection.SdpSemantics.UNIFIED_PLAN
+-                continualGatheringPolicy =
+-                    PeerConnection.ContinualGatheringPolicy.GATHER_CONTINUALLY
+-            }
+-
+-        // WARP: SNAP (SCTP Negotiation Acceleration Protocol) puts this side's SCTP INIT parameters
+-        // into the SDP data m-section, letting a data channel skip SCTP's cookie exchange and saving
+-        // up to two round trips on setup. It's negotiated with the server and falls back to plain
+-        // SCTP when unsupported, so it's enabled unconditionally, even over a user-provided config.
+-        rtcConfig.enableSctpSnap = true
+-
+-        val clientConfig = when (serverResponse) {
+-            is Either.Left -> {
+-                if (serverResponse.value.hasClientConfiguration()) {
+-                    serverResponse.value.clientConfiguration
+-                } else {
+-                    null
+-                }
+-            }
+-
+-            is Either.Right -> {
+-                if (serverResponse.value.hasClientConfiguration()) {
+-                    serverResponse.value.clientConfiguration
+-                } else {
+-                    null
+-                }
+-            }
+-        }
+-        if (clientConfig != null) {
+-            if (clientConfig.forceRelay == LivekitModels.ClientConfigSetting.ENABLED) {
+-                rtcConfig.iceTransportsType = PeerConnection.IceTransportsType.RELAY
+-            }
++            continualGatheringPolicy = PeerConnection.ContinualGatheringPolicy.GATHER_CONTINUALLY
++            enableSctpSnap = true
+         }
+ 
+         return rtcConfig
+@@ -1187,7 +1125,7 @@
+         fun onRoomUpdate(update: LivekitModels.Room)
+         fun onConnectionQuality(updates: List<LivekitRtc.ConnectionQualityInfo>)
+         fun onSpeakersChanged(speakers: List<LivekitModels.SpeakerInfo>)
+-        fun onUserPacket(packet: LivekitModels.UserPacket, kind: LivekitModels.DataPacket.Kind, encryptionType: LivekitModels.Encryption.Type)
++        fun onUserPacket(dataPacket: LivekitModels.DataPacket, encryptionType: LivekitModels.Encryption.Type, keyEpoch: Long)
+         fun onStreamStateUpdate(streamStates: List<LivekitRtc.StreamStateInfo>)
+         fun onSubscribedQualityUpdate(subscribedQualityUpdate: LivekitRtc.SubscribedQualityUpdate)
+         fun onRequestSubscribedCodecRefresh() {}
+@@ -1257,7 +1195,7 @@
+     override fun onServerAnswer(sessionDescription: SessionDescription, offerId: Int) {
+         LKLog.v { "received server answer: ${sessionDescription.type}, ${runBlocking { publisher?.signalingState() }}" }
+         coroutineScope.launch {
+-            when (val outcome = publisher?.setRemoteDescription(sessionDescription, offerId).nullSafe()) {
++            when (val outcome = publisher?.setRemoteDescription(sessionDescription.udpOnly(), offerId).nullSafe()) {
+                 is Either.Left -> {
+                     listener?.onRequestSubscribedCodecRefresh()
+                 }
+@@ -1273,7 +1211,7 @@
+         LKLog.v { "received server offer: ${sessionDescription.type}, ${runBlocking { publisher?.signalingState() }}" }
+         coroutineScope.launch {
+             run {
+-                when (val outcome = subscriber?.setRemoteDescription(sessionDescription, offerId).nullSafe()) {
++                when (val outcome = subscriber?.setRemoteDescription(sessionDescription.udpOnly(), offerId).nullSafe()) {
+                     is Either.Right -> {
+                         LKLog.e { "error setting remote description for offer: ${outcome.value} " }
+                         return@launch
+@@ -1318,7 +1256,18 @@
+         }
+     }
+ 
++    private fun isUdpCandidate(candidate: String): Boolean =
++        candidate.split(' ').getOrNull(2).equals("udp", ignoreCase = true)
++
++    private fun SessionDescription.udpOnly(): SessionDescription {
++        val sdp = description.lineSequence()
++            .filter { !it.startsWith("a=candidate:") || isUdpCandidate(it) }
++            .joinToString("\r\n")
++        return SessionDescription(type, sdp)
++    }
++
+     override fun onTrickle(candidate: IceCandidate, target: LivekitRtc.SignalTarget) {
++        if (!isUdpCandidate(candidate.sdp)) return
+         LKLog.v { "received ice candidate from peer: $candidate, $target" }
+         when (target) {
+             LivekitRtc.SignalTarget.PUBLISHER -> {
+@@ -1508,11 +1457,58 @@
+             incomingDataTrackManager.handlePacketReceived(ByteString.copyFrom(buffer.data).toByteArray())
+             return
+         }
+-        var dp = try {
++        val packet = try {
+             LivekitModels.DataPacket.parseFrom(ByteString.copyFrom(buffer.data))
+         } catch (e: InvalidProtocolBufferException) {
+             LKLog.w(e) { "Failed to parse data packet, dropping." }
+             return
++        }
++
++        if (packet.hasEncryptedPacket()) {
++            val gate = e2EEManager?.keyProvider as? io.livekit.android.e2ee.ChirpDataGate ?: return
++            if (packet.encryptedPacket.encryptionType != LivekitModels.Encryption.Type.GCM) return
++            gate.receiveEncryptedData(packet.encryptedPacket.keyIndex, packet.serializedSize) { epoch ->
++                receiveDataPacket(packet, epoch)
++            }
++        } else {
++            receiveDataPacket(packet, null)
++        }
++    }
++
++    private fun receiveDataPacket(packet: LivekitModels.DataPacket, receivedEpoch: Long?) {
++        var dp = packet
++        var encryptionType = LivekitModels.Encryption.Type.NONE
++        if (dp.hasEncryptedPacket()) {
++            val dataPacketCryptor = dataPacketCryptorManager ?: return
++            val gate = e2EEManager?.keyProvider as? io.livekit.android.e2ee.ChirpDataGate ?: return
++            val index = dp.encryptedPacket.keyIndex
++            if (receivedEpoch == null || gate.receiveDataEpoch(index) != receivedEpoch) return
++            val encryptedPacket = EncryptedPacket(
++                dp.encryptedPacket.encryptedValue.toByteArray(),
++                dp.encryptedPacket.iv.toByteArray(),
++                dp.encryptedPacket.keyIndex,
++            )
++            encryptionType = dp.encryptedPacket.encryptionType
++
++            val decryptedData = dataPacketCryptor.decrypt(Participant.Identity(dp.participantIdentity), encryptedPacket)
++            if (decryptedData == null) {
++                LKLog.i { "Failed to decrypt data packet." }
++                return
++            }
++            val payload = try {
++                LivekitModels.EncryptedPacketPayload.parseFrom(decryptedData)
++            } catch (e: InvalidProtocolBufferException) {
++                LKLog.w(e) { "Failed to parse decrypted data packet, dropping." }
++                return
++            } finally {
++                decryptedData.fill(0)
++            }
++            if (gate.receiveDataEpoch(index) != receivedEpoch) return
++
++            dp = with(dp.toBuilder()) {
++                setFromEncryptedPayload(payload)
++                build()
++            }
+         }
+ 
+         if (dp.sequence > 0 && dp.participantSid.isNotEmpty()) {
+@@ -1526,42 +1522,13 @@
+             }
+         }
+ 
+-        // Always decrypt if able, to allow for backward compatibility.
+-        val dataPacketCryptor = dataPacketCryptorManager
+-        var encryptionType = LivekitModels.Encryption.Type.NONE
+-        if (dp.hasEncryptedPacket() && dataPacketCryptor != null) {
+-            val encryptedPacket = EncryptedPacket(
+-                dp.encryptedPacket.encryptedValue.toByteArray(),
+-                dp.encryptedPacket.iv.toByteArray(),
+-                dp.encryptedPacket.keyIndex,
+-            )
+-            encryptionType = dp.encryptedPacket.encryptionType
+-
+-            val decryptedData = dataPacketCryptor.decrypt(Participant.Identity(dp.participantIdentity), encryptedPacket)
+-            if (decryptedData == null) {
+-                LKLog.i { "Failed to decrypt data packet." }
+-                return
+-            }
+-            val payload = try {
+-                LivekitModels.EncryptedPacketPayload.parseFrom(decryptedData)
+-            } catch (e: InvalidProtocolBufferException) {
+-                LKLog.w(e) { "Failed to parse decrypted data packet, dropping." }
+-                return
+-            }
+-
+-            dp = with(dp.toBuilder()) {
+-                setFromEncryptedPayload(payload)
+-                build()
+-            }
+-        }
+-
+         when (dp.valueCase) {
+             LivekitModels.DataPacket.ValueCase.SPEAKER -> {
+                 listener?.onActiveSpeakersUpdate(dp.speaker.speakersList)
+             }
+ 
+             LivekitModels.DataPacket.ValueCase.USER -> {
+-                listener?.onUserPacket(dp.user, dp.kind, encryptionType)
++                listener?.onUserPacket(dp, encryptionType, receivedEpoch ?: return)
+             }
+ 
+             LivekitModels.DataPacket.ValueCase.SIP_DTMF -> {
+--- a/io/livekit/android/room/Room.kt
++++ b/io/livekit/android/room/Room.kt
+@@ -515,6 +515,7 @@
+ 
+             if (roomOptions.e2eeOptions != null) {
+                 e2eeManager = e2EEManagerFactory.create(roomOptions.e2eeOptions.keyProvider).apply {
++                    dataChannelEncryptionEnabled = true
+                     setup(this@Room) { event ->
+                         coroutineScope.launch {
+                             emitWhenConnected(event)
+@@ -1286,6 +1287,7 @@
+      * @suppress
+      */
+     override fun onAddTrack(receiver: RtpReceiver, track: MediaStreamTrack, streams: Array<out MediaStream>) {
++        track.setEnabled(false)
+         if (streams.isEmpty()) {
+             LKLog.i { "add track with empty streams?" }
+             return
+@@ -1412,8 +1414,9 @@
+     /**
+      * @suppress
+      */
+-    override fun onUserPacket(packet: LivekitModels.UserPacket, kind: LivekitModels.DataPacket.Kind, encryptionType: LivekitModels.Encryption.Type) {
+-        val participant = getParticipantBySid(packet.participantSid) as? RemoteParticipant
++    override fun onUserPacket(dataPacket: LivekitModels.DataPacket, encryptionType: LivekitModels.Encryption.Type, keyEpoch: Long) {
++        val packet = dataPacket.chirpEncryptedUser(encryptionType) ?: return
++        val participant = remoteParticipants[Participant.Identity(packet.participantIdentity)] ?: return
+         val data = packet.payload.toByteArray()
+         val topic = if (packet.hasTopic()) {
+             packet.topic
+@@ -1421,9 +1424,9 @@
+             null
+         }
+ 
+-        val event = RoomEvent.DataReceived(this, data, participant, topic, encryptionType)
++        val event = RoomEvent.DataReceived(this, data, participant, topic, encryptionType, keyEpoch)
+         eventBus.postEvent(event, coroutineScope)
+-        participant?.onDataReceived(event)
++        participant.onDataReceived(event)
+     }
+ 
+     /**
+--- a/io/livekit/android/room/SubscriberTransportObserver.kt
++++ b/io/livekit/android/room/SubscriberTransportObserver.kt
+@@ -60,6 +60,7 @@
+         executeOnRTCThread(rtcThreadToken) {
+             val track = receiver.track() ?: return@executeOnRTCThread
+             LKLog.v { "onAddTrack: ${track.kind()}, ${track.id()}, ${streams.fold("") { sum, it -> "$sum, $it" }}" }
++            track.setEnabled(false)
+             engine.listener?.onAddTrack(receiver, track, streams)
+         }
+     }
+--- a/io/livekit/android/room/participant/LocalParticipant.kt
++++ b/io/livekit/android/room/participant/LocalParticipant.kt
+@@ -21,7 +21,6 @@
+ import android.content.Intent
+ import androidx.annotation.CheckResult
+ import androidx.annotation.VisibleForTesting
+-import com.google.protobuf.ByteString
+ import dagger.assisted.Assisted
+ import dagger.assisted.AssistedFactory
+ import dagger.assisted.AssistedInject
+@@ -37,6 +36,7 @@
+ import io.livekit.android.room.Room
+ import io.livekit.android.room.SenderTransceiverHandle
+ import io.livekit.android.room.TrackBitrateInfo
++import io.livekit.android.room.chirpUserDataPacket
+ import io.livekit.android.room.datastream.outgoing.OutgoingDataStreamManager
+ import io.livekit.android.room.datatrack.DataTrackPublishException
+ import io.livekit.android.room.datatrack.DataTrackPublishOptions
+@@ -194,6 +194,12 @@
+         return LocalAudioTrack.createTrack(context, peerConnectionFactory, options, audioTrackFactory, name)
+     }
+ 
++    /** Local-only capture holder. ICE is disabled, including all host candidates. */
++    fun chirpLocalCapturePeer(observer: livekit.org.webrtc.PeerConnection.Observer): livekit.org.webrtc.PeerConnection? =
++        peerConnectionFactory.createPeerConnection(livekit.org.webrtc.PeerConnection.RTCConfiguration(emptyList()).apply {
++            iceTransportsType = livekit.org.webrtc.PeerConnection.IceTransportsType.NONE
++        }, observer)
++
+     /**
+      * Creates a video track, recording video through the supplied [capturer].
+      *
+@@ -749,6 +755,11 @@
+                 is LocalAudioTrack -> {
+                     previousTrackTransceiver = track.transceiver
+                     track.transceiver = transceiver
++                    // The authenticated clear prefix of an audio frame must contain only codec metadata.
++                    val codecs = capabilitiesGetter(livekit.org.webrtc.MediaStreamTrack.MediaType.MEDIA_TYPE_AUDIO).codecs
++                        .filter { it.mimeType.equals("audio/opus", true) || it.mimeType.equals("audio/red", true) }
++                    check(codecs.any { it.mimeType.equals("audio/opus", true) })
++                    transceiver.setCodecPreferences(codecs).throwError()
+                 }
+ 
+                 else -> {
+@@ -1052,8 +1063,12 @@
+ 
+             // Each publish creates a new transceiver, plus one per backup codec. Removing the
+             // track from its sender doesn't release them, so they would otherwise be retained
+-            // until the connection closes. Stopping them releases the native resources and frees
+-            // the SDP m-sections for reuse. Limited to video, where this leak is significant.
++            // until the connection closes. Stop audio transceivers as well because Chirp
++            // unpublishes the microphone to release capture when the user mutes.
++            if (track is LocalAudioTrack) {
++                engine.stopTransceivers(listOfNotNull(track.transceiver))
++                track.transceiver = null
++            }
+             if (track is LocalVideoTrack) {
+                 engine.stopTransceivers(listOfNotNull(track.transceiver) + track.simulcastTransceivers)
+                 track.transceiver = null
+@@ -1211,20 +1226,14 @@
+             DataPublishReliability.RELIABLE -> DataPacket.Kind.RELIABLE
+             DataPublishReliability.LOSSY -> DataPacket.Kind.LOSSY
+         }
+-        val packetBuilder = LivekitModels.UserPacket.newBuilder().apply {
+-            payload = ByteString.copyFrom(data)
+-            participantSid = sid.value
+-            if (topic != null) {
+-                setTopic(topic)
+-            }
+-            if (identities != null) {
+-                addAllDestinationIdentities(identities.map { it.value })
+-            }
+-        }
+-        val dataPacket = DataPacket.newBuilder()
+-            .setUser(packetBuilder)
+-            .setKind(kind)
+-            .build()
++        val dataPacket = chirpUserDataPacket(
++            identity = identity?.value,
++            sid = sid.value,
++            kind = kind,
++            data = data,
++            topic = topic,
++            destinations = identities.orEmpty().map { it.value },
++        ) ?: return Result.failure(IllegalStateException("Chirp sender identity is unavailable"))
+ 
+         return engine.sendData(dataPacket)
+     }
+--- a/io/livekit/android/room/participant/RemoteParticipant.kt
++++ b/io/livekit/android/room/participant/RemoteParticipant.kt
+@@ -222,7 +222,8 @@
+         track.sid = publication.sid
+ 
+         addTrackPublication(publication)
+-        track.start()
++        // Chirp enables each track after attaching the cryptor and verifying its roster and lease.
++        track.enabled = false
+ 
+         // TODO: how does mediatrack send ended event?
+ 
+--- a/io/livekit/android/room/PeerConnectionTransport.kt
++++ b/io/livekit/android/room/PeerConnectionTransport.kt
+@@ -49,6 +49,7 @@
+ import kotlinx.coroutines.runBlocking
+ import kotlinx.coroutines.sync.Mutex
+ import kotlinx.coroutines.sync.withLock
++import livekit.org.webrtc.AddIceObserver
+ import livekit.org.webrtc.IceCandidate
+ import livekit.org.webrtc.MediaConstraints
+ import livekit.org.webrtc.PeerConnection
+@@ -119,10 +120,17 @@
+         fun onOffer(sd: SessionDescription, offerId: Int)
+     }
+ 
++    private val iceObserver = object : AddIceObserver {
++        override fun onAddSuccess() = Unit
++        override fun onAddFailure(reason: String) {
++            if (!isClosed()) LKLog.w { "ICE candidate was rejected" }
++        }
++    }
++
+     fun addIceCandidate(candidate: IceCandidate) {
+         executeRTCIfNotClosed {
+             if (peerConnection.remoteDescription != null && !restartingIce) {
+-                peerConnection.addIceCandidate(candidate)
++                peerConnection.addIceCandidate(candidate, iceObserver)
+             } else {
+                 pendingCandidates.add(candidate)
+             }
+@@ -142,9 +150,11 @@
+                 return@launchRTCIfNotClosed Either.Right("Old offer, ignoring. Expected: $currentOfferId, actual: $offerId")
+             }
+             val result = peerConnection.setRemoteDescription(sd)
++            // The SDP observer suspends this coroutine. close() may have disposed the peer meanwhile.
++            if (isClosed()) return@launchRTCIfNotClosed Either.Right("PCT is closed.")
+             if (result is Either.Left) {
+                 pendingCandidates.forEach { pending ->
+-                    peerConnection.addIceCandidate(pending)
++                    peerConnection.addIceCandidate(pending, iceObserver)
+                 }
+                 pendingCandidates.clear()
+                 restartingIce = false
+@@ -353,7 +363,7 @@
+     }
+ 
+     fun prepareForIceRestart() {
+-        restartingIce = true
++        executeRTCIfNotClosed { restartingIce = true }
+     }
+ 
+     fun isClosed() = isClosed.get()
+@@ -367,6 +377,7 @@
+     suspend fun close() {
+         launchRTCIfNotClosed {
+             isClosed.set(true)
++            pendingCandidates.clear()
+             peerConnection.dispose()
+         }
+         coroutineScope.cancel()
+--- a/io/livekit/android/events/RoomEvent.kt
++++ b/io/livekit/android/events/RoomEvent.kt
+@@ -256,6 +256,7 @@
+         val participant: RemoteParticipant?,
+         val topic: String?,
+         val encryptionType: LivekitModels.Encryption.Type,
++        val keyEpoch: Long,
+     ) :
+         RoomEvent(room)
+ 

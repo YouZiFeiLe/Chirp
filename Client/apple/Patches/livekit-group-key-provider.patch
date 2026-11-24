@@ -1,0 +1,498 @@
+diff --git a/Sources/LiveKit/Core/Room+SignalClientDelegate.swift b/Sources/LiveKit/Core/Room+SignalClientDelegate.swift
+index 7045d22..2e721e1 100644
+--- a/Sources/LiveKit/Core/Room+SignalClientDelegate.swift
++++ b/Sources/LiveKit/Core/Room+SignalClientDelegate.swift
+@@ -110,9 +110,8 @@ extension Room: SignalClientDelegate {
+         if case let .join(joinResponse) = connectResponse {
+             log("\(joinResponse.serverInfo)", .info)
+ 
+-            if e2eeManager != nil, !joinResponse.sifTrailer.isEmpty {
+-                e2eeManager?.keyProvider.setSifTrailer(trailer: joinResponse.sifTrailer)
+-            }
++            // Chirp accepts authenticated client media only; do not install the
++            // server-provided plaintext silence-frame trailer.
+ 
+             _state.mutate {
+                 $0.apply(roomInfo: joinResponse.room)
+diff --git a/Sources/LiveKit/Core/Transport.swift b/Sources/LiveKit/Core/Transport.swift
+index 226857a..6a400f3 100644
+--- a/Sources/LiveKit/Core/Transport.swift
++++ b/Sources/LiveKit/Core/Transport.swift
+@@ -685,6 +685,9 @@ extension Transport: LKRTCPeerConnectionDelegate {
+             return
+         }
+ 
++        // This callback is already on WebRTC's signaling thread. Hold playout
++        // until RemoteParticipant installs the cryptor and starts the track.
++        track.isEnabled = false
+         log("type: \(type(of: track)), track.id: \(track.trackId), streams: \(streams.map { "Stream(hash: \($0.hash), id: \($0.streamId), videoTracks: \($0.videoTracks.count), audioTracks: \($0.audioTracks.count))" })")
+         let receiver = RTCReceiver(rtpReceiver)
+         let mediaTrack = RTCMediaTrack(track)
+diff --git a/Sources/LiveKit/E2EE/E2EEManager.swift b/Sources/LiveKit/E2EE/E2EEManager.swift
+index bb1fd4f..8fff8ec 100644
+--- a/Sources/LiveKit/E2EE/E2EEManager.swift
++++ b/Sources/LiveKit/E2EE/E2EEManager.swift
+@@ -44,7 +44,7 @@ public class E2EEManager: NSObject, @unchecked Sendable, ObservableObject, Logga
+     public let options: EncryptionOptions?
+ 
+     public var keyProvider: BaseKeyProvider {
+-        options?.keyProvider ?? e2eeOptions?.keyProvider ?? BaseKeyProvider()
++        _state.read { chirpKeyProvider(for: $0) }
+     }
+ 
+     public var frameEncryptionType: EncryptionType {
+@@ -78,14 +78,28 @@ public class E2EEManager: NSObject, @unchecked Sendable, ObservableObject, Logga
+ 
+     private struct State: Equatable {
+         var enabled: Bool = true
++        var chirpKeyProvider: BaseKeyProvider?
++        var chirpTracks = [CryptorKey: Track]()
++        var chirpBindings = [CryptorKey: ChirpBinding]()
+         var frameCryptors = [CryptorKey: LKRTCFrameCryptor]()
+         var trackPublications = [LKRTCFrameCryptor: TrackPublication]()
+         var dataCryptor: LKRTCDataPacketCryptor?
+         var keyIndexGeneration: UInt64 = 0
+     }
+ 
++    private func chirpKeyProvider(for state: State) -> BaseKeyProvider {
++        state.chirpKeyProvider ?? options?.keyProvider ?? e2eeOptions?.keyProvider ?? BaseKeyProvider()
++    }
++
+     typealias CryptorKey = [Participant.Identity: Track.Sid]
+ 
++    private struct ChirpBinding: Equatable, Sendable {
++        let id: ObjectIdentifier
++        let sender: RTCSender?
++        let receiver: RTCReceiver?
++        static func == (lhs: Self, rhs: Self) -> Bool { lhs.id == rhs.id }
++    }
++
+     /// Building a frame cryptor has to hop to the RTC executor, so an attach cannot complete
+     /// synchronously inside a room delegate callback. Requests are queued here instead and applied
+     /// one at a time in the order they arrived, which is what keeps a detach from overtaking the
+@@ -93,7 +107,10 @@ public class E2EEManager: NSObject, @unchecked Sendable, ObservableObject, Logga
+     private enum Request: Sendable {
+         case attach(LocalTrackPublication, Participant.Identity)
+         case attachRemote(RemoteTrackPublication, Participant.Identity)
+-        case detach(CryptorKey)
++        case detach(CryptorKey, TrackPublication)
++        case chirpRekey(BaseKeyProvider, CheckedContinuation<Void, Never>)
++        case chirpPrepareLocal(LocalTrackPublication, Participant.Identity, Bool, CheckedContinuation<Bool, Never>)
++        case chirpPrepareRemote(RemoteTrackPublication, Participant.Identity, CheckedContinuation<Bool, Never>)
+     }
+ 
+     private let requestContinuation: AsyncStream<Request>.Continuation
+@@ -130,8 +147,15 @@ public class E2EEManager: NSObject, @unchecked Sendable, ObservableObject, Logga
+     }
+ 
+     private func observeKeyIndex() {
+-        keyProvider.addKeyIndexObserver(self) { [weak self] index, generation in
+-            self?.setSenderKeyIndex(index, generation: generation)
++        let provider = keyProvider
++        provider.addKeyIndexObserver(self) { [weak self, weak provider] index, generation in
++            guard let self, let provider else { return }
++            self._state.mutate { state in
++                // An observer already copied by a retiring provider must not
++                // stamp cryptors belonging to the replacement provider.
++                guard self.chirpKeyProvider(for: state) === provider else { return }
++                Self.apply(index, generation: generation, to: &state)
++            }
+         }
+     }
+ 
+@@ -157,7 +181,7 @@ public class E2EEManager: NSObject, @unchecked Sendable, ObservableObject, Logga
+             $0.trackPublications[frameCryptor] = publication
+             frameCryptor.enabled = $0.enabled
+             if publication is LocalTrackPublication {
+-                let current = keyProvider.currentKeyIndexWithGeneration()
++                let current = chirpKeyProvider(for: $0).currentKeyIndexWithGeneration()
+                 frameCryptor.keyIndex = current.index
+                 Self.apply(current.index, generation: current.generation, to: &$0)
+             }
+@@ -167,11 +191,70 @@ public class E2EEManager: NSObject, @unchecked Sendable, ObservableObject, Logga
+     private func apply(_ request: Request) async {
+         switch request {
+         case let .attach(publication, participantIdentity):
++            guard publication.track?.trackState == .started else { return }
+             await addRtpSender(publication: publication, participantIdentity: participantIdentity)
+         case let .attachRemote(publication, participantIdentity):
++            guard publication.track?.trackState == .started else { return }
+             await addRtpReceiver(publication: publication, participantIdentity: participantIdentity)
+-        case let .detach(key):
++        case let .detach(key, publication):
++            guard let cryptor = _state.frameCryptors[key],
++                  _state.trackPublications[cryptor] === publication,
++                  let track = _state.chirpTracks[key] else { return }
++            // A delayed unsubscribe/unpublish callback cannot remove an
++            // already-active binding and cause its frame counter to reset.
++            if track is LocalTrack {
++                guard track._state.rtpSender == nil else { return }
++            } else {
++                guard track.trackState != .started else { return }
++            }
+             detachCryptor(key)
++        case let .chirpPrepareLocal(publication, identity, allowRetired, completion):
++            let allowed = !keyProvider.chirpIsRetired || (allowRetired && publication.isMuted)
++            let attached = allowed ? await addRtpSender(publication: publication, participantIdentity: identity) : false
++            completion.resume(returning: attached && (!keyProvider.chirpIsRetired || (allowRetired && publication.isMuted)))
++        case let .chirpPrepareRemote(publication, identity, completion):
++            completion.resume(returning: await addRtpReceiver(publication: publication, participantIdentity: identity))
++        case let .chirpRekey(provider, completion):
++            guard provider !== keyProvider else { completion.resume(); return }
++            let receivingTracks = _state.chirpTracks.values.filter { $0 is RemoteTrack && $0.trackState == .started }
++            for track in receivingTracks { _ = try? await track.disable() }
++            let previousProvider = keyProvider
++            previousProvider.removeKeyIndexObserver(self)
++            previousProvider.chirpRetireKeys()
++            _state.mutate {
++                for cryptor in $0.frameCryptors.values { cryptor.delegate = nil }
++                $0.frameCryptors.removeAll()
++                $0.trackPublications.removeAll()
++                $0.chirpTracks.removeAll()
++                $0.chirpBindings.removeAll()
++                $0.dataCryptor = nil
++                $0.chirpKeyProvider = provider
++                $0.keyIndexGeneration = 0
++            }
++            observeKeyIndex()
++            if let room = _room {
++                for publication in room.localParticipant.trackPublications.values {
++                    if let publication = publication as? LocalTrackPublication,
++                       let identity = room.localParticipant.identity {
++                        await addRtpSender(publication: publication, participantIdentity: identity)
++                    }
++                }
++                for participant in room.remoteParticipants.values {
++                    for publication in participant.trackPublications.values {
++                        if let publication = publication as? RemoteTrackPublication,
++                           let identity = participant.identity {
++                            await addRtpReceiver(publication: publication, participantIdentity: identity)
++                        }
++                    }
++                }
++                addDataChannelCryptor()
++            }
++            for track in receivingTracks {
++                if track.trackState == .started, _state.read({ $0.chirpTracks.values.contains { $0 === track } }) {
++                    _ = try? await track.enable()
++                }
++            }
++            completion.resume()
+         }
+     }
+ 
+@@ -179,8 +262,9 @@ public class E2EEManager: NSObject, @unchecked Sendable, ObservableObject, Logga
+         _state.mutate {
+             guard let frameCryptor = $0.frameCryptors.removeValue(forKey: key) else { return }
+             frameCryptor.delegate = nil
+-            frameCryptor.enabled = false
+             $0.trackPublications.removeValue(forKey: frameCryptor)
++            $0.chirpTracks.removeValue(forKey: key)
++            $0.chirpBindings.removeValue(forKey: key)
+         }
+     }
+ 
+@@ -211,6 +295,40 @@ public class E2EEManager: NSObject, @unchecked Sendable, ObservableObject, Logga
+         addDataChannelCryptor()
+     }
+ 
++    /// Replaces all native frame cryptors and their provider in the ordered RTC
++    /// request stream. The caller must pause publishing before invoking this.
++    /// Encryption remains enabled, including when the new provider has no keys.
++    public func chirpReplaceKeyProvider(_ provider: BaseKeyProvider) async {
++        await withCheckedContinuation { completion in
++            requestContinuation.yield(.chirpRekey(provider, completion))
++        }
++    }
++
++    /// Installs a local track's frame cryptor before the caller unmutes it.
++    /// Repeated calls retain the existing cryptor and its frame counter.
++    /// Returns false when encryption or the RTP sender is unavailable.
++    public func chirpPrepareLocalTrack(_ publication: LocalTrackPublication, identity: Participant.Identity) async -> Bool {
++        await withCheckedContinuation { completion in
++            requestContinuation.yield(.chirpPrepareLocal(publication, identity, false, completion))
++        }
++    }
++
++    // SDK reconnect publication may precede group recovery. It can attach a
++    // cryptor backed by retired random material while the microphone is muted;
++    // the public preparation barrier still refuses to authorize its unmute.
++    func chirpPrepareMutedLocalTrack(_ publication: LocalTrackPublication, identity: Participant.Identity) async -> Bool {
++        guard publication.isMuted else { return false }
++        return await withCheckedContinuation { completion in
++            requestContinuation.yield(.chirpPrepareLocal(publication, identity, true, completion))
++        }
++    }
++
++    func chirpPrepareRemoteTrack(_ publication: RemoteTrackPublication, identity: Participant.Identity) async -> Bool {
++        await withCheckedContinuation { completion in
++            requestContinuation.yield(.chirpPrepareRemote(publication, identity, completion))
++        }
++    }
++
+     public func enableE2EE(enabled: Bool) {
+         _state.mutate {
+             $0.enabled = enabled
+@@ -220,65 +338,55 @@ public class E2EEManager: NSObject, @unchecked Sendable, ObservableObject, Logga
+         }
+     }
+ 
+-    func addRtpSender(publication: LocalTrackPublication, participantIdentity: Participant.Identity) async {
+-        guard publication.encryptionType != .none else {
++    @discardableResult
++    func addRtpSender(publication: LocalTrackPublication, participantIdentity: Participant.Identity) async -> Bool {
++        guard publication.encryptionType == .gcm, _state.enabled, let track = publication.track else {
+             log("encryptionType is .none, skipping creating frame cryptor...", .warning)
+-            return
+-        }
+-
+-        guard let sender = publication.track?._state.rtpSender else {
+-            log("sender is nil, skipping creating frame cryptor...", .warning)
+-            return
++            return false
+         }
+-
+-        // The raw sender is `@RTC`-confined and `LKRTCFrameCryptor` is not `Sendable`, so build
+-        // and install it entirely on the RTC executor.
+-        await RTC.run {
++        let key: CryptorKey = [participantIdentity: publication.sid]
++        guard let sender = track._state.rtpSender else { return false }
++        return await RTC.run {
++            let binding = ChirpBinding(id: ObjectIdentifier(sender.raw), sender: sender, receiver: nil)
++            if _state.frameCryptors[key] != nil {
++                return _state.read { $0.chirpTracks[key] === track && $0.chirpBindings[key] == binding }
++            }
++            detachCryptor(key)
+             guard let frameCryptor = LKRTCFrameCryptor(factory: RTC.peerConnectionFactory,
+                                                        rtpSender: sender.raw,
+                                                        participantId: participantIdentity.stringValue,
+                                                        algorithm: .aesGcm,
+-                                                       keyProvider: keyProvider.rtcKeyProvider)
+-            else {
+-                log("frameCryptor is nil, skipping creating frame cryptor...", .warning)
+-                return
+-            }
+-
++                                                       keyProvider: keyProvider.rtcKeyProvider) else { return false }
+             install(frameCryptor: frameCryptor, for: publication, participantIdentity: participantIdentity)
++            _state.mutate { $0.chirpTracks[key] = track; $0.chirpBindings[key] = binding }
++            return true
+         }
+     }
+ 
+-    func addRtpReceiver(publication: RemoteTrackPublication, participantIdentity: Participant.Identity) async {
+-        guard publication.encryptionType != .none else {
+-            log("encryptionType is .none, skipping creating frame cryptor...", .warning)
+-            return
+-        }
+-
+-        guard let receiver = publication.track?._state.rtpReceiver else {
+-            log("receiver is nil, skipping creating frame cryptor...", .warning)
+-            return
+-        }
+-
+-        // The raw receiver is `@RTC`-confined and `LKRTCFrameCryptor` is not `Sendable`, so build
+-        // and install it entirely on the RTC executor.
+-        await RTC.run {
++    @discardableResult
++    func addRtpReceiver(publication: RemoteTrackPublication, participantIdentity: Participant.Identity) async -> Bool {
++        guard publication.encryptionType == .gcm, _state.enabled, let track = publication.track,
++              let receiver = track._state.rtpReceiver else { return false }
++        let key: CryptorKey = [participantIdentity: publication.sid]
++        return await RTC.run {
++            let binding = ChirpBinding(id: ObjectIdentifier(receiver.raw), sender: nil, receiver: receiver)
++            if _state.read({ $0.frameCryptors[key] != nil && $0.chirpTracks[key] === track && $0.chirpBindings[key] == binding }) { return true }
++            detachCryptor(key)
+             guard let frameCryptor = LKRTCFrameCryptor(factory: RTC.peerConnectionFactory,
+                                                        rtpReceiver: receiver.raw,
+                                                        participantId: participantIdentity.stringValue,
+                                                        algorithm: .aesGcm,
+-                                                       keyProvider: keyProvider.rtcKeyProvider)
+-            else {
+-                log("frameCryptor is nil, skipping creating frame cryptor...", .warning)
+-                return
+-            }
+-
++                                                       keyProvider: keyProvider.rtcKeyProvider) else { return false }
+             install(frameCryptor: frameCryptor, for: publication, participantIdentity: participantIdentity)
++            _state.mutate { $0.chirpTracks[key] = track; $0.chirpBindings[key] = binding }
++            return true
+         }
+     }
+ 
+     private func addDataChannelCryptor() {
+-        _state.mutate {
+-            $0.dataCryptor = LKRTCDataPacketCryptor(algorithm: .aesGcm, keyProvider: keyProvider.rtcKeyProvider)
++        _state.mutate { state in
++            let provider = chirpKeyProvider(for: state)
++            state.dataCryptor = LKRTCDataPacketCryptor(algorithm: .aesGcm, keyProvider: provider.rtcKeyProvider)
+         }
+     }
+ 
+@@ -287,12 +395,15 @@ public class E2EEManager: NSObject, @unchecked Sendable, ObservableObject, Logga
+     }
+ 
+     func cleanUp(isFullReconnect: Bool) {
++        keyProvider.chirpRetireKeys()
+         _state.mutate {
+             for (_, frameCryptor) in $0.frameCryptors {
+                 frameCryptor.delegate = nil
+             }
+             $0.frameCryptors.removeAll()
+             $0.trackPublications.removeAll()
++            $0.chirpTracks.removeAll()
++            $0.chirpBindings.removeAll()
+             // The data cryptor is key-provider-scoped (not bound to a transport), and its users —
+             // encrypted data payloads and the data-track subsystem — survive a full reconnect, so
+             // keep it: nothing re-runs setup() until the next explicit connect.
+@@ -333,7 +444,7 @@ extension E2EEManager: RoomDelegate {
+ 
+     public func room(_: Room, participant: LocalParticipant, didUnpublishTrack publication: LocalTrackPublication) {
+         guard let participantIdentity = participant.identity else { return }
+-        requestContinuation.yield(.detach([participantIdentity: publication.sid]))
++        requestContinuation.yield(.detach([participantIdentity: publication.sid], publication))
+     }
+ 
+     public func room(_: Room, participant: RemoteParticipant, didSubscribeTrack publication: RemoteTrackPublication) {
+@@ -343,7 +454,7 @@ extension E2EEManager: RoomDelegate {
+ 
+     public func room(_: Room, participant: RemoteParticipant, didUnsubscribeTrack publication: RemoteTrackPublication) {
+         guard let participantIdentity = participant.identity else { return }
+-        requestContinuation.yield(.detach([participantIdentity: publication.sid]))
++        requestContinuation.yield(.detach([participantIdentity: publication.sid], publication))
+     }
+ }
+ 
+diff --git a/Sources/LiveKit/E2EE/KeyProvider.swift b/Sources/LiveKit/E2EE/KeyProvider.swift
+index efa58ef..db6152a 100644
+--- a/Sources/LiveKit/E2EE/KeyProvider.swift
++++ b/Sources/LiveKit/E2EE/KeyProvider.swift
+@@ -15,6 +15,7 @@
+  */
+ 
+ import Foundation
++import CryptoKit
+ 
+ internal import LiveKitWebRTC
+ 
+@@ -113,6 +114,8 @@ public final class BaseKeyProvider: NSObject, Loggable, Sendable {
+ 
+     struct State {
+         var currentKeyIndex: Int32 = 0
++        var chirpKeySlots: [String: Set<Int32>] = [:]
++        var chirpRetired = false
+         var keyIndexGeneration: UInt64 = 0
+         var keyIndexObservers = [ObjectIdentifier: @Sendable (Int32, UInt64) -> Void]()
+     }
+@@ -167,19 +170,37 @@ public final class BaseKeyProvider: NSObject, Loggable, Sendable {
+     ///   - index: The key index to set. Defaults to the current key index.
+     public func setKey(keyData: Data, participantId: String? = nil, index: Int32? = nil) {
+         let targetIndex = index ?? getCurrentKeyIndex()
+-
+-        if options.sharedKey {
+-            rtcKeyProvider.setSharedKey(keyData, with: targetIndex)
+-            setCurrentKeyIndex(targetIndex)
+-            return
++        let installed = _state.mutate { state -> Bool in
++            guard !state.chirpRetired else { return false }
++            if options.sharedKey {
++                rtcKeyProvider.setSharedKey(keyData, with: targetIndex)
++            } else {
++                guard let participantId else { return false }
++                rtcKeyProvider.setKey(keyData, with: targetIndex, forParticipant: participantId)
++                state.chirpKeySlots[participantId, default: []].insert(targetIndex)
++            }
++            return true
+         }
++        if installed && options.sharedKey { setCurrentKeyIndex(targetIndex) }
++    }
+ 
+-        guard let participantId else {
+-            log("setKey: Please provide valid participantId for non-SharedKey mode.")
+-            return
++    var chirpIsRetired: Bool { _state.chirpRetired }
++
++    // Native cryptors may outlive their wrappers. Retire their material without
++    // disabling encryption, which could otherwise permit plaintext passthrough.
++    func chirpRetireKeys() {
++        _state.mutate { state in
++            guard !state.chirpRetired, !options.sharedKey else { return }
++            state.chirpRetired = true
++            for (identity, indices) in state.chirpKeySlots {
++                for index in indices {
++                    var tombstone = SymmetricKey(size: .bits256).withUnsafeBytes { Data($0) }
++                    rtcKeyProvider.setKey(tombstone, with: index, forParticipant: identity)
++                    tombstone.resetBytes(in: 0..<tombstone.count)
++                }
++            }
++            state.chirpKeySlots.removeAll()
+         }
+-
+-        rtcKeyProvider.setKey(keyData, with: targetIndex, forParticipant: participantId)
+     }
+ 
+     public func ratchetKey(participantId: String? = nil, index: Int32? = nil) -> Data? {
+diff --git a/Sources/LiveKit/Participant/LocalParticipant.swift b/Sources/LiveKit/Participant/LocalParticipant.swift
+index c19b43d..196edb5 100644
+--- a/Sources/LiveKit/Participant/LocalParticipant.swift
++++ b/Sources/LiveKit/Participant/LocalParticipant.swift
+@@ -34,7 +34,8 @@ public class LocalParticipant: Participant, @unchecked Sendable {
+ 
+     private var trackPermissions: [ParticipantTrackPermission] = []
+ 
+-    /// publish a new audio track to the Room
++    /// Publishes an audio track. Chirp's E2EE tracks remain muted until the
++    /// application validates its current group lease and explicitly unmutes.
+     @discardableResult
+     public func publish(audioTrack: LocalAudioTrack, options: AudioPublishOptions? = nil) async throws -> LocalTrackPublication {
+         let result = try await _publishSerialRunner.run {
+@@ -756,6 +757,12 @@ extension LocalParticipant {
+             throw LiveKitError(.invalidState, message: "Unknown LocalTrack type")
+         }
+ 
++        // Never negotiate a live microphone before its frame cryptor exists.
++        // Re-publication after reconnect follows the same muted startup path.
++        if room.e2eeManager != nil, let audioTrack = track as? LocalAudioTrack {
++            try await audioTrack.mute()
++        }
++
+         // Try to start the Track
+         try await track.start()
+         // Starting the Track could be time consuming especially for camera etc.
+@@ -950,6 +957,18 @@ extension LocalParticipant {
+ 
+             add(publication: publication)
+ 
++            if let manager = room.e2eeManager {
++                guard let identity else {
++                    throw LiveKitError(.encryptionFailed, message: "Participant identity is missing")
++                }
++                let prepared = track is LocalAudioTrack
++                    ? await manager.chirpPrepareMutedLocalTrack(publication, identity: identity)
++                    : await manager.chirpPrepareLocalTrack(publication, identity: identity)
++                guard prepared else {
++                    throw LiveKitError(.encryptionFailed, message: "Frame cryptor was not installed")
++                }
++            }
++
+             // Notify didPublish
+             delegates.notify(label: { "localParticipant.didPublish \(publication)" }) {
+                 $0.participant?(self, didPublishTrack: publication)
+diff --git a/Sources/LiveKit/Participant/RemoteParticipant.swift b/Sources/LiveKit/Participant/RemoteParticipant.swift
+index 7dee9cd..4a1ef8e 100644
+--- a/Sources/LiveKit/Participant/RemoteParticipant.swift
++++ b/Sources/LiveKit/Participant/RemoteParticipant.swift
+@@ -167,6 +167,13 @@ public class RemoteParticipant: Participant, @unchecked Sendable {
+ 
+         add(publication: publication)
+ 
++        if let manager = room.e2eeManager {
++            guard let identity = identity,
++                  await manager.chirpPrepareRemoteTrack(publication, identity: identity) else {
++                throw LiveKitError(.decryptionFailed, message: "Frame cryptor was not installed")
++            }
++        }
++
+         try await track.start()
+ 
+         delegates.notify(label: { "participant.didSubscribe \(publication)" }) {

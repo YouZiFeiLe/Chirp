@@ -1,0 +1,13 @@
+<resources>
+    <string name="call_diagnostics">通话诊断</string>
+    <string name="diagnostics_export">导出脱敏诊断</string>
+    <string name="audio_diagnostics_contents">导出包含通话阶段、音轨统计与固定错误码，不包含身份、设备名称、地址、聊天或音频。</string>
+    <string name="remote_track_unencrypted">检测到未加密的麦克风音轨，通话已结束。</string>
+    <string name="track_encryption_failed">音频加密失败，通话已结束。</string>
+    <string name="track_not_published">对方尚未发布麦克风音轨</string>
+    <string name="track_network_lost">网络连接已丢失</string>
+    <string name="track_subscription_failed">麦克风音轨订阅失败</string>
+    <plurals name="voice_tracks_recovering">
+        <item quantity="other">有 %1$d 个音轨等待恢复解密</item>
+    </plurals>
+</resources>

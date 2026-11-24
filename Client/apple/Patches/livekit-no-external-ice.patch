@@ -1,0 +1,38 @@
+diff --git a/Sources/LiveKit/Core/Room+Engine.swift b/Sources/LiveKit/Core/Room+Engine.swift
+index b9b1d1f..536a5d3 100644
+--- a/Sources/LiveKit/Core/Room+Engine.swift
++++ b/Sources/LiveKit/Core/Room+Engine.swift
+@@ -162,6 +162,8 @@ extension Room {
+ // MARK: - Internal
+ 
+ extension Room {
++    public static var chirpNoExternalICEServers: Bool { true }
++
+     /// Builds the peer connection configuration.
+     ///
+     /// - Parameter connectResponse: The JOIN/RECONNECT response, or `nil` before the socket has
+@@ -174,19 +176,11 @@ extension Room {
+         // Make a copy, instead of modifying the user-supplied RTCConfiguration object.
+         let rtcConfiguration = LKRTCConfiguration.liveKitDefault()
+ 
+-        // Set iceServers provided by the server
+-        rtcConfiguration.iceServers = connectResponse?.rtcIceServers ?? []
+-
+-        if !connectOptions.iceServers.isEmpty {
+-            // Override with user provided iceServers
+-            rtcConfiguration.iceServers = connectOptions.iceServers.map { $0.toRTCType() }
+-        }
+-
+-        if connectResponse?.clientConfiguration.forceRelay == .enabled {
+-            rtcConfiguration.iceTransportPolicy = .relay
+-        } else {
+-            rtcConfiguration.iceTransportPolicy = connectOptions.iceTransportPolicy.toRTCType()
+-        }
++        // Chirp: the only remote media endpoint is our own public SFU.
++        // Apply this policy before signaling, on JOIN, and on RECONNECT.
++        // Never consume server-supplied or user-supplied STUN/TURN lists.
++        rtcConfiguration.iceServers = []
++        rtcConfiguration.iceTransportPolicy = .all
+ 
+         rtcConfiguration.enableDscp = connectOptions.isDscpEnabled
+ 

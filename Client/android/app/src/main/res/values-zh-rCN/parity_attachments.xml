@@ -1,0 +1,4 @@
+<resources>
+    <string name="attachment_local_copy">服务器副本已移除，本地仍可用</string>
+    <string name="attachment_preview_failed">无法预览这张图片。</string>
+</resources>

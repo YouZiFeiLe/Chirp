@@ -1,0 +1,13 @@
+workflow:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG'
+    - when: never
+
+stages:
+  - publish
+
+publish_open_source:
+  stage: publish
+  resource_group: github-main
+  script:
+    - sh scripts/publish-open-source.sh

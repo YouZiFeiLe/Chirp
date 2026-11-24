@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48" fill="none">
+  <style>.base{fill:#246448}.wave{stroke:#fff}@media(prefers-color-scheme:dark){.base{fill:#a9dab5}.wave{stroke:#123721}}</style>
+  <rect class="base" width="48" height="48" rx="15"/>
+  <path class="wave" d="M12 21v6m6-11v16m6-22v28m6-19v10m6-8v6" stroke-width="3" stroke-linecap="round"/>
+</svg>

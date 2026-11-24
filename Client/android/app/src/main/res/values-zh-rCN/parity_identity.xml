@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pair_unlock_required">请验证本机身份后授权新设备。</string>
+    <string name="peer_device_revoked">此身份或设备已被拉黑。</string>
+    <string name="parity_choose_backup">选择已保存的文件进行校验（可选）</string>
+    <string name="parity_verify_backup">校验恢复文件</string>
+    <string name="parity_saved_identities">本机保存的身份</string>
+    <string name="parity_account_fingerprint">账号密钥指纹</string>
+    <string name="parity_no_saved_identities">尚未找到已保存的账号。</string>
+    <string name="parity_use_qr_identity">根据配对码选择账号</string>
+    <string name="parity_find_identity">查找此前保存的账号</string>
+    <string name="parity_identity_origin">身份服务地址</string>
+    <string name="parity_account_id">账号 ID</string>
+    <string name="parity_select_identity">查找并选择</string>
+    <string name="parity_callback_invalid">此登录响应与当前请求不匹配，请重新发起登录。</string>
+    <string name="parity_configuration_changed">服务器的服务地址已变更，请重新确认服务器。</string>
+</resources>

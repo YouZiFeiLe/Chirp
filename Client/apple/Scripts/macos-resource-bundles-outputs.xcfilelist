@@ -1,0 +1,16 @@
+# Only the obsolete standalone signatures may be removed before the app is signed.
+$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/ChirpAudio_ChirpAudio.bundle/Contents/_CodeSignature
+$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/ChirpAudio_ChirpAudio.bundle/Contents/_CodeSignature/CodeDirectory
+$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/ChirpAudio_ChirpAudio.bundle/Contents/_CodeSignature/CodeRequirements
+$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/ChirpAudio_ChirpAudio.bundle/Contents/_CodeSignature/CodeResources
+$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/ChirpAudio_ChirpAudio.bundle/Contents/_CodeSignature/CodeSignature
+$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/ChirpMLS_ChirpMLS.bundle/Contents/_CodeSignature
+$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/ChirpMLS_ChirpMLS.bundle/Contents/_CodeSignature/CodeDirectory
+$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/ChirpMLS_ChirpMLS.bundle/Contents/_CodeSignature/CodeRequirements
+$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/ChirpMLS_ChirpMLS.bundle/Contents/_CodeSignature/CodeResources
+$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/ChirpMLS_ChirpMLS.bundle/Contents/_CodeSignature/CodeSignature
+$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/LiveKit_LiveKit.bundle/Contents/_CodeSignature
+$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/LiveKit_LiveKit.bundle/Contents/_CodeSignature/CodeDirectory
+$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/LiveKit_LiveKit.bundle/Contents/_CodeSignature/CodeRequirements
+$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/LiveKit_LiveKit.bundle/Contents/_CodeSignature/CodeResources
+$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/LiveKit_LiveKit.bundle/Contents/_CodeSignature/CodeSignature

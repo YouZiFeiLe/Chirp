@@ -1,0 +1,4 @@
+<resources>
+    <string name="attachment_local_copy">Server copy removed. Available on this device.</string>
+    <string name="attachment_preview_failed">This image could not be previewed.</string>
+</resources>

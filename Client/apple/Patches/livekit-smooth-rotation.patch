@@ -1,0 +1,109 @@
+diff --git a/Sources/LiveKit/E2EE/E2EEManager.swift b/Sources/LiveKit/E2EE/E2EEManager.swift
+index b79709a..f400a3c 100644
+--- a/Sources/LiveKit/E2EE/E2EEManager.swift
++++ b/Sources/LiveKit/E2EE/E2EEManager.swift
+@@ -109,6 +109,7 @@ public class E2EEManager: NSObject, @unchecked Sendable, ObservableObject, Logga
+         case attachRemote(RemoteTrackPublication, Participant.Identity)
+         case detach(CryptorKey, TrackPublication)
+         case chirpRekey(BaseKeyProvider, CheckedContinuation<Void, Never>)
++        case chirpActivateKeyIndex(BaseKeyProvider, Int32, CheckedContinuation<Bool, Never>)
+         case chirpPrepareLocal(LocalTrackPublication, Participant.Identity, Bool, CheckedContinuation<Bool, Never>)
+         case chirpPrepareRemote(RemoteTrackPublication, Participant.Identity, CheckedContinuation<Bool, Never>)
+     }
+@@ -214,6 +215,17 @@ public class E2EEManager: NSObject, @unchecked Sendable, ObservableObject, Logga
+             completion.resume(returning: attached && (!keyProvider.chirpIsRetired || (allowRetired && publication.isMuted)))
+         case let .chirpPrepareRemote(publication, identity, completion):
+             completion.resume(returning: await addRtpReceiver(publication: publication, participantIdentity: identity))
++        case let .chirpActivateKeyIndex(provider, index, completion):
++            let activated = await RTC.run {
++                self._state.mutate { state in
++                    guard self.chirpKeyProvider(for: state) === provider, state.enabled,
++                          provider.chirpActivateKeyIndex(index) else { return false }
++                    let current = provider.currentKeyIndexWithGeneration()
++                    Self.apply(current.index, generation: current.generation, to: &state)
++                    return true
++                }
++            }
++            completion.resume(returning: activated)
+         case let .chirpRekey(provider, completion):
+             guard provider !== keyProvider else { completion.resume(); return }
+             let receivingTracks = _state.chirpTracks.values.filter { $0 is RemoteTrack && $0.trackState == .started }
+@@ -304,6 +316,28 @@ public class E2EEManager: NSObject, @unchecked Sendable, ObservableObject, Logga
+         }
+     }
+ 
++    public func chirpStageKeys(_ keys: [String: Data], index: Int32, using provider: BaseKeyProvider) -> Bool {
++        _state.read { state in
++            guard state.enabled, chirpKeyProvider(for: state) === provider else { return false }
++            return provider.chirpStageKeys(keys, index: index)
++        }
++    }
++
++    /// Selects already-installed keys without replacing RTP cryptors, resetting
++    /// their counters, or stopping the capture/playout devices.
++    public func chirpActivateKeyIndex(_ index: Int32, using provider: BaseKeyProvider) async -> Bool {
++        await withCheckedContinuation { completion in
++            requestContinuation.yield(.chirpActivateKeyIndex(provider, index, completion))
++        }
++    }
++
++    public func chirpRetireKeyIndex(_ index: Int32, using provider: BaseKeyProvider) -> Bool {
++        _state.read { state in
++            guard chirpKeyProvider(for: state) === provider else { return false }
++            return provider.chirpRetireKeyIndex(index)
++        }
++    }
++
+     /// Installs a local track's frame cryptor before the caller unmutes it.
+     /// Repeated calls retain the existing cryptor and its frame counter.
+     /// Returns false when encryption or the RTP sender is unavailable.
+diff --git a/Sources/LiveKit/E2EE/KeyProvider.swift b/Sources/LiveKit/E2EE/KeyProvider.swift
+index db6152a..8ddd654 100644
+--- a/Sources/LiveKit/E2EE/KeyProvider.swift
++++ b/Sources/LiveKit/E2EE/KeyProvider.swift
+@@ -186,6 +186,45 @@ public final class BaseKeyProvider: NSObject, Loggable, Sendable {
+ 
+     var chirpIsRetired: Bool { _state.chirpRetired }
+ 
++    // Preloading must not change currentKeyIndex: data-channel encryption reads
++    // it directly. Only the ordered RTP activation barrier may advance it.
++    func chirpStageKeys(_ keys: [String: Data], index: Int32) -> Bool {
++        _state.mutate { state in
++            guard !state.chirpRetired, !options.sharedKey, index >= 0, index < options.keyRingSize,
++                  index != state.currentKeyIndex, !keys.isEmpty,
++                  Set(keys.keys) == Set(state.chirpKeySlots.keys), keys.values.allSatisfy({ $0.count == 32 }) else { return false }
++            for (identity, key) in keys {
++                rtcKeyProvider.setKey(key, with: index, forParticipant: identity)
++                state.chirpKeySlots[identity, default: []].insert(index)
++            }
++            return true
++        }
++    }
++
++    func chirpActivateKeyIndex(_ index: Int32) -> Bool {
++        _state.mutate { state in
++            guard !state.chirpRetired, !options.sharedKey, index >= 0, index < options.keyRingSize,
++                  !state.chirpKeySlots.isEmpty, state.chirpKeySlots.values.allSatisfy({ $0.contains(index) }) else { return false }
++            state.currentKeyIndex = index
++            state.keyIndexGeneration += 1
++            return true
++        }
++    }
++
++    func chirpRetireKeyIndex(_ index: Int32) -> Bool {
++        _state.mutate { state in
++            guard !state.chirpRetired, !options.sharedKey, index >= 0, index < options.keyRingSize,
++                  index != state.currentKeyIndex else { return false }
++            for identity in Array(state.chirpKeySlots.keys) where state.chirpKeySlots[identity]?.contains(index) == true {
++                var tombstone = SymmetricKey(size: .bits256).withUnsafeBytes { Data($0) }
++                rtcKeyProvider.setKey(tombstone, with: index, forParticipant: identity)
++                tombstone.resetBytes(in: 0..<tombstone.count)
++                state.chirpKeySlots[identity]?.remove(index)
++            }
++            return true
++        }
++    }
++
+     // Native cryptors may outlive their wrappers. Retire their material without
+     // disabling encryption, which could otherwise permit plaintext passthrough.
+     func chirpRetireKeys() {

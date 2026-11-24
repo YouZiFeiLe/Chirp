@@ -1,0 +1,14 @@
+<resources>
+    <string name="call_diagnostics">Call diagnostics</string>
+    <string name="diagnostics_export">Export anonymized diagnostics</string>
+    <string name="audio_diagnostics_contents">The export contains call stages, track statistics and fixed error codes. Identities, device names, addresses, chat and audio are excluded.</string>
+    <string name="remote_track_unencrypted">The call ended because a microphone track was not encrypted.</string>
+    <string name="track_encryption_failed">The call ended because audio encryption failed.</string>
+    <string name="track_not_published">No microphone track published</string>
+    <string name="track_network_lost">Network connection lost</string>
+    <string name="track_subscription_failed">Microphone track subscription failed</string>
+    <plurals name="voice_tracks_recovering">
+        <item quantity="one">%1$d audio track is waiting for decryption to recover</item>
+        <item quantity="other">%1$d audio tracks are waiting for decryption to recover</item>
+    </plurals>
+</resources>

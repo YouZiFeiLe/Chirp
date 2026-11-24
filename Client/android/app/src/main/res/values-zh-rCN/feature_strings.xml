@@ -1,0 +1,27 @@
+<resources>
+    <string name="error_audio_preset">无法应用音频处理方式，请重新选择。</string>
+    <string name="error_microphone_sample">没有可试听的录音，请重新测试麦克风。</string>
+    <string name="room_verifying">正在验证入房…</string>
+    <string name="preset_webrtc">WebRTC 回声消除＋内置降噪</string>
+    <string name="preset_echo">WebRTC 回声消除（无降噪）</string>
+    <string name="voice_threshold">激活阈值：%1$d dBFS</string>
+    <string name="voice_input_level">输入电平：%1$d dBFS</string>
+    <string name="voice_no_input">开启麦克风或开始本机测试以查看输入电平</string>
+    <string name="microphone_test_starting">正在启动麦克风…</string>
+    <string name="microphone_test_measuring">正在测量输入</string>
+    <string name="microphone_test_stopping">正在停止测试…</string>
+    <string name="microphone_test_leave">离开通话后可测试麦克风</string>
+    <string name="member_volume">本机收听音量：%1$d%%</string>
+    <string name="track_jitter">抖动：%1$d ms</string>
+    <string name="track_average_jitter_buffer">接收缓冲平均等待 %1$d 毫秒</string>
+    <string name="track_rtt">往返时延：%1$d ms</string>
+    <string name="track_lost">累计丢包：%1$d</string>
+    <string name="track_received">累计收包：%1$d</string>
+    <plurals name="track_decrypted">
+        <item quantity="other">上次解密成功在 %1$d 秒前</item>
+    </plurals>
+    <string name="file_cancelling">正在确认取消结果，可再次取消以重试</string>
+    <string name="file_cancelled">附件已取消</string>
+    <string name="file_verifying">正在校验附件…</string>
+    <string name="avatar_preview">已选头像预览</string>
+</resources>

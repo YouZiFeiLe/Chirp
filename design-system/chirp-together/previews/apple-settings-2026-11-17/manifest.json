@@ -1,0 +1,174 @@
+{
+  "schemaVersion": 1,
+  "archivedOn": "2026-11-17",
+  "timeZone": "Asia/Hong_Kong",
+  "baseGitCommit": "217569121eb82769b6985479ed99820a1b84a0b2",
+  "workingTreeIncludesUncommittedChanges": true,
+  "environment": {
+    "macOS": "27.2.1",
+    "xcode": "27.2 (27B52)",
+    "iosDevice": "iPhone 18 Pro Simulator",
+    "iosRuntime": "iOS 27.2",
+    "fontSize": "normal",
+    "iosOrientation": "portrait"
+  },
+  "notes": [
+    "Screenshots are actual SwiftUI views with display-only sample data, not concept images.",
+    "iOS images are tool-optimized preview pixels; do not infer device point dimensions from them.",
+    "Purple window sharing controls and macOS chrome belong to the system.",
+    "Source hashes describe the final working tree. Earlier iOS captures precede only small preview/control changes that do not alter their visible content.",
+    "No landscape or large-type acceptance was requested. No live identity mutation, microphone, or media acceptance was performed."
+  ],
+  "selectedSourceHashes": {
+    "Client/apple/Shared/Views/ClientSettingsView.swift": "213dd281950476747dbcb60838a91ab70f18575570b7369fce42bc34f4552ee0",
+    "Client/apple/Shared/Views/FriendsView.swift": "284ddacf3ff5b4adbbbc6bcc9c3b3fd6df647d602828626ebe8822c4899030c5",
+    "Client/apple/Shared/Views/IdentityDeviceCard.swift": "515bbde344e42b6a11a899cc0ddecc6f3971f93fe9d5337b28cae5ab631a150d",
+    "Client/apple/Shared/Views/IdentitySettingsView.swift": "d283dff7a8b7c93ea3963e9a578d4277472417c17386be94c20f114041e66e2b",
+    "Client/apple/Shared/Views/SettingsComponents.swift": "7df3afd5e81871b5c9c64c49d73fe1aa4300f4214fc8f6869fe5c416dab57ab6",
+    "Client/apple/Shared/Views/SettingsDesignPreview.swift": "7b5c27bbcb4c50c999e0316b453d07c540d5044956751385c7ec7c731ffb69aa",
+    "Client/apple/Shared/Views/MacClientView.swift": "04c0802700647169b27b6686b492daeda76bcd39f975b1718e61920a5c2fd097",
+    "Client/apple/Shared/Views/IOSClientView.swift": "c2072b55970c6e131ff95b753abe3d340b1155f613b28abd9a9eb634ba5d0b35",
+    "Client/apple/Shared/Views/ChirpDesignReference.swift": "35638cedc7b82b20a6d27bc08cfbacced9ae4201fb11c41db7df44254f90ed1e",
+    "Client/apple/Shared/Views/ChirpTheme.swift": "515c4d742b595925df32d71f8891f507b17366ee3bf735afda744c645aa4e9cd",
+    "Client/apple/Shared/ChirpApp.swift": "3d63ca3bfd6812a867b00d1f20432ac149157ac21742d31d38ff999e72a20dfe",
+    "Client/apple/Shared/ContentView.swift": "1c64537dd5c8493af6108c1636cb0fb319c7379943eef85d6170da0643776f47",
+    "Client/apple/Shared/SocialIdentity.swift": "246b75a88aebc8ae6b80e63fb6536d6f8b6529e2ee8ed114a6c194141b0d5101"
+  },
+  "assets": [
+    {
+      "file": "mac-settings-light.png",
+      "pixels": {
+        "width": 1320,
+        "height": 1616
+      },
+      "sha256": "272ac527c01e47d378cc69851135f8a3b72da0fff947a3ba336ce42794710fb1",
+      "platform": "macOS",
+      "appearance": "light",
+      "language": "zh-Hans",
+      "capturedOn": "2026-11-17",
+      "captureKind": "CUA native unedited PNG",
+      "pixelScale": 2,
+      "dataMode": "offline display fixtures, no credentials or active call"
+    },
+    {
+      "file": "mac-devices-light.png",
+      "pixels": {
+        "width": 1320,
+        "height": 1616
+      },
+      "sha256": "81debc96a518609b9461b6b4807360d4f9d2444a768d22ce153df408786f741b",
+      "platform": "macOS",
+      "appearance": "light",
+      "language": "zh-Hans",
+      "capturedOn": "2026-11-17",
+      "captureKind": "CUA native unedited PNG",
+      "pixelScale": 2,
+      "dataMode": "offline display fixtures, no credentials or active call"
+    },
+    {
+      "file": "mac-blacklist-light.png",
+      "pixels": {
+        "width": 1320,
+        "height": 1616
+      },
+      "sha256": "44ede7cac03fae17c286ac1f174ba0fc7688f5d428733a468aab256eac72ec59",
+      "platform": "macOS",
+      "appearance": "light",
+      "language": "zh-Hans",
+      "capturedOn": "2026-11-17",
+      "captureKind": "CUA native unedited PNG",
+      "pixelScale": 2,
+      "dataMode": "offline display fixtures, no credentials or active call"
+    },
+    {
+      "file": "mac-friends-light.png",
+      "pixels": {
+        "width": 2240,
+        "height": 1560
+      },
+      "sha256": "89918ca5b6c5c0bf5cc6209a9f06e042b290e620a6993599a854c4a5d2df36e0",
+      "platform": "macOS",
+      "appearance": "light",
+      "language": "zh-Hans",
+      "capturedOn": "2026-11-17",
+      "captureKind": "CUA native unedited PNG",
+      "pixelScale": 2,
+      "dataMode": "offline display fixtures, no credentials or active call"
+    },
+    {
+      "file": "ios-settings-light.jpg",
+      "pixels": {
+        "width": 368,
+        "height": 800
+      },
+      "sha256": "705e00b1065de1ab3b20ffc856769e65ee269cc9498fac6e5168cd3db8c011ba",
+      "platform": "iOS",
+      "appearance": "light",
+      "language": "zh-Hans",
+      "capturedOn": "2026-11-17",
+      "captureKind": "XcodeBuildMCP optimized JPEG",
+      "pixelScale": null,
+      "dataMode": "offline display fixtures, no credentials or active call"
+    },
+    {
+      "file": "ios-devices-light.jpg",
+      "pixels": {
+        "width": 368,
+        "height": 800
+      },
+      "sha256": "df54ea2ecb052503cf900bf9ef99bb759c9d85d21cb2d05f285cb56b277bfdff",
+      "platform": "iOS",
+      "appearance": "light",
+      "language": "zh-Hans",
+      "capturedOn": "2026-11-17",
+      "captureKind": "XcodeBuildMCP optimized JPEG",
+      "pixelScale": null,
+      "dataMode": "offline display fixtures, no credentials or active call"
+    },
+    {
+      "file": "ios-blacklist-light.jpg",
+      "pixels": {
+        "width": 368,
+        "height": 800
+      },
+      "sha256": "8533c8b1a3c3a1c820b1aa02e936d43f4c80c55bc6477211c1e33c1ea803b7fe",
+      "platform": "iOS",
+      "appearance": "light",
+      "language": "zh-Hans",
+      "capturedOn": "2026-11-17",
+      "captureKind": "XcodeBuildMCP optimized JPEG",
+      "pixelScale": null,
+      "dataMode": "offline display fixtures, no credentials or active call"
+    },
+    {
+      "file": "ios-blacklist-empty-light.jpg",
+      "pixels": {
+        "width": 368,
+        "height": 800
+      },
+      "sha256": "e1fbb64df053dab2936ba2985c116a4ab83b476356980c75df6de5e38c1310ad",
+      "platform": "iOS",
+      "appearance": "light",
+      "language": "zh-Hans",
+      "capturedOn": "2026-11-17",
+      "captureKind": "XcodeBuildMCP optimized JPEG",
+      "pixelScale": null,
+      "dataMode": "offline display fixtures, no credentials or active call"
+    },
+    {
+      "file": "ios-friends-light.jpg",
+      "pixels": {
+        "width": 368,
+        "height": 800
+      },
+      "sha256": "8eced4750f256ff952d823279709f2c089cd1727c58299adff6c5867e7e57421",
+      "platform": "iOS",
+      "appearance": "light",
+      "language": "zh-Hans",
+      "capturedOn": "2026-11-17",
+      "captureKind": "XcodeBuildMCP optimized JPEG",
+      "pixelScale": null,
+      "dataMode": "offline display fixtures, no credentials or active call"
+    }
+  ]
+}

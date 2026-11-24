@@ -1,0 +1,24 @@
+{
+  "originHash" : "6256d22991387d18b7056f351e71140ad5e121b4572069080abbb3d7d8762557",
+  "pins" : [
+    {
+      "identity" : "livekit-ffi-xcframework",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/livekit/livekit-ffi-xcframework.git",
+      "state" : {
+        "revision" : "bef05a06ce54727ce33d62b7fbbce09bf54151df",
+        "version" : "0.14.0"
+      }
+    },
+    {
+      "identity" : "webrtc-xcframework",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/livekit/webrtc-xcframework.git",
+      "state" : {
+        "revision" : "b34647c69f8f048d5ed1df3ddcb478f346621653",
+        "version" : "150.7871.8"
+      }
+    }
+  ],
+  "version" : 3
+}

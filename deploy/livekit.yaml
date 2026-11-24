@@ -1,0 +1,56 @@
+# 此文件由 deploy/compose.yaml 的绑定目录方案挂载，按实际媒体主机设置 rtc.node_ip。
+# 公开成品镜像部署使用仓库根目录 compose.yaml 中的 LIVEKIT_CONFIG 和 CHIRP_RTC_NODE_IP。
+
+# HTTP 管理与 WebSocket 信令端口；已有 Nginx 负责公网 HTTPS/WSS 和 SSL 证书。
+# 修改此容器端口时，同步修改 deploy/compose.yaml 的 LIVEKIT_HTTP_URL 和端口映射。
+port: 7880
+
+# 容器内监听所有 IPv4 地址，供 Docker 发布端口与同网络的 app 服务访问。
+# 保留 0.0.0.0，不要填写容器回环地址、宿主机 IP 或 Nginx 的 IP。
+# 宿主机 7880/TCP 由 .env 的 CHIRP_HTTP_PUBLISH_IP=127.0.0.1 仅发布到宿主机回环地址。
+bind_addresses:
+  - "0.0.0.0"
+
+rtc:
+  # 语音统一使用 UDP 7882，可直接保留；在服务器防火墙/云安全组放行 UDP 7882。
+  # 客户端直接连接自有 LiveKit 的该端口；不经 Nginx 的 HTTP 反代。
+  # Compose 已做宿主机 7882/UDP → 容器 7882/UDP 映射，不要将外部端口改为其他值。
+  # 若服务器公网 IP 还经过云平台 NAT，需另将公网 UDP 7882 转发到宿主机 UDP 7882。
+  udp_port: 7882
+
+  # 关闭端口范围分配，使用上方单一 UDP 端口。
+  port_range_start: 0
+  port_range_end: 0
+
+  # 关闭 ICE/TCP 媒体监听；HTTPS/WSS 信令仍按正常方式使用 TCP。
+  tcp_port: 0
+
+  # 关闭通过外部 STUN 自动探测公网 IP，使用下方手动填写的固定公网地址。
+  use_external_ip: false
+
+  # 【必填】替换为这台 LiveKit 服务器可被客户端访问的真实公网 IP。
+  # 可从服务器提供商控制台查看公网 IPv4；只写 IP，不写协议、域名或端口。
+  # 不要填写 Docker bridge 分配的容器 IP，也不要用容器服务名代替公网 IP。
+  # 如果 Nginx 位于另一台服务器，这里仍填写 LiveKit 所在服务器的公网 IP。
+  node_ip: "XX.XX.XX.XX"
+
+  # UDP 不可用时直接显示媒体连接失败，不回退到媒体 TCP 或 TURN。
+  allow_tcp_fallback: false
+  allow_udp_unstable_fallback: false
+
+# 房间不设固定人数上限（0）；保留 Opus 与音频冗余编码支持，不启用视频编码。
+room:
+  max_participants: 0
+  enabled_codecs:
+    - mime: audio/opus
+    - mime: audio/red
+
+# 不启用 LiveKit 内置 TURN，也不额外部署或配置第三方 STUN/TURN 服务。
+turn:
+  enabled: false
+
+# keys 由 Compose 的 LIVEKIT_KEYS 注入，与 app 复用 .env 的签名凭据。
+
+# 上游 LiveKit 仍可能在入房响应中下发默认公共 STUN 列表，单靠此 YAML 无法阻止。
+# 配套客户端通过各平台的媒体构建配置清空外部 ICE 服务器列表，见 docs/architecture.md。
+# 仅保留客户端与这台自有 LiveKit 之间必需的 ICE/STUN 协议交互，不建立客户端之间的 P2P。

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pair_unlock_required">Unlock this device to authorize the new device.</string>
+    <string name="peer_device_revoked">This identity or device has been blocked.</string>
+    <string name="parity_choose_backup">Choose a saved file to verify (optional)</string>
+    <string name="parity_verify_backup">Verify recovery file</string>
+    <string name="parity_saved_identities">Saved identities</string>
+    <string name="parity_account_fingerprint">Account key fingerprint</string>
+    <string name="parity_no_saved_identities">No saved accounts found.</string>
+    <string name="parity_use_qr_identity">Choose account from the pairing code</string>
+    <string name="parity_find_identity">Find a previously saved account</string>
+    <string name="parity_identity_origin">Identity service origin</string>
+    <string name="parity_account_id">Account ID</string>
+    <string name="parity_select_identity">Find and select</string>
+    <string name="parity_callback_invalid">This sign-in response does not match the current request. Start sign-in again.</string>
+    <string name="parity_configuration_changed">The server changed its service addresses. Confirm the server again.</string>
+</resources>

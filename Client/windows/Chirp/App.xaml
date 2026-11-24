@@ -1,0 +1,256 @@
+<Application x:Class="Chirp.App"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Application.Resources>
+  <ResourceDictionary>
+    <ResourceDictionary.MergedDictionaries>
+      <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls"/>
+    </ResourceDictionary.MergedDictionaries>
+    <ResourceDictionary.ThemeDictionaries>
+      <ResourceDictionary x:Key="Light">
+        <LinearGradientBrush x:Key="CoverRibbonBrush" StartPoint="0,0.2" EndPoint="1,0.7">
+          <GradientStop Color="#78A9E3"/><GradientStop Color="#AAE8E2" Offset="0.4"/>
+          <GradientStop Color="#80D9BF" Offset="0.68"/><GradientStop Color="#EAC89B" Offset="1"/>
+        </LinearGradientBrush>
+        <SolidColorBrush x:Key="PageBrush" Color="#F4F6F6"/>
+        <SolidColorBrush x:Key="PanelBrush" Color="#FFFFFF"/>
+        <SolidColorBrush x:Key="SubtleBrush" Color="#E9EEEF"/>
+        <SolidColorBrush x:Key="EdgeBrush" Color="#D9E1E2"/>
+        <SolidColorBrush x:Key="InkBrush" Color="#18282D"/>
+        <SolidColorBrush x:Key="QuietBrush" Color="#51636A"/>
+        <SolidColorBrush x:Key="OwnMessageBrush" Color="#DDF1ED"/>
+        <SolidColorBrush x:Key="SpeakingInkBrush" Color="#006B59"/>
+        <SolidColorBrush x:Key="SpeakingSurfaceBrush" Color="#DDF4EC"/>
+        <SolidColorBrush x:Key="RoomVerificationCanvasBrush" Color="#FBEDEA"/>
+        <SolidColorBrush x:Key="RoomVerificationSurfaceBrush" Color="#FBE1DD"/>
+        <SolidColorBrush x:Key="RoomVerificationEdgeBrush" Color="#AA5852"/>
+        <LinearGradientBrush x:Key="RoomCoverBrush" StartPoint="0,0" EndPoint="1,0.8">
+          <GradientStop Color="#E0F2ED"/><GradientStop Color="#F4F7F4" Offset="0.58"/><GradientStop Color="#E5EFF1" Offset="1"/>
+        </LinearGradientBrush>
+        <LinearGradientBrush x:Key="RoomRibbonBrush" StartPoint="0,0" EndPoint="1,0.3">
+          <GradientStop Color="#527F90"/><GradientStop Color="#23857D" Offset="0.56"/><GradientStop Color="#BD8955" Offset="1"/>
+        </LinearGradientBrush>
+        <StaticResource x:Key="BrandBrush" ResourceKey="AccentTextFillColorPrimaryBrush"/>
+        <SolidColorBrush x:Key="DangerBrush" Color="#A8243A"/>
+        <SolidColorBrush x:Key="SignInTextBrush" Color="#F5FBF8"/>
+        <SolidColorBrush x:Key="SignInSecondaryBrush" Color="#C0DBD9"/>
+        <SolidColorBrush x:Key="Avatar0Fill" Color="#E0E6FC"/>
+        <SolidColorBrush x:Key="Avatar0Ink" Color="#3B4A96"/>
+        <SolidColorBrush x:Key="Avatar1Fill" Color="#DCEFEA"/>
+        <SolidColorBrush x:Key="Avatar1Ink" Color="#205B50"/>
+        <SolidColorBrush x:Key="Avatar2Fill" Color="#EEE2F5"/>
+        <SolidColorBrush x:Key="Avatar2Ink" Color="#6D3C80"/>
+        <SolidColorBrush x:Key="Avatar3Fill" Color="#F5E8DE"/>
+        <SolidColorBrush x:Key="Avatar3Ink" Color="#79472B"/>
+        <LinearGradientBrush x:Key="SignInBackdropBrush" StartPoint="0,0" EndPoint="1,1">
+          <GradientStop Color="#102F39"/><GradientStop Color="#19484A" Offset="0.54"/><GradientStop Color="#0C3037" Offset="1"/>
+        </LinearGradientBrush>
+        <SolidColorBrush x:Key="NavigationViewExpandedPaneBackground" Color="Transparent"/>
+        <SolidColorBrush x:Key="NavigationViewContentBackground" Color="Transparent"/>
+      </ResourceDictionary>
+      <ResourceDictionary x:Key="Dark">
+        <LinearGradientBrush x:Key="CoverRibbonBrush" StartPoint="0,0.2" EndPoint="1,0.7">
+          <GradientStop Color="#78A9E3"/><GradientStop Color="#AAE8E2" Offset="0.4"/>
+          <GradientStop Color="#80D9BF" Offset="0.68"/><GradientStop Color="#EAC89B" Offset="1"/>
+        </LinearGradientBrush>
+        <SolidColorBrush x:Key="PageBrush" Color="#171D20"/>
+        <SolidColorBrush x:Key="PanelBrush" Color="#21292D"/>
+        <SolidColorBrush x:Key="SubtleBrush" Color="#2B363A"/>
+        <SolidColorBrush x:Key="EdgeBrush" Color="#364246"/>
+        <SolidColorBrush x:Key="InkBrush" Color="#EFF5F4"/>
+        <SolidColorBrush x:Key="QuietBrush" Color="#B4C3C5"/>
+        <SolidColorBrush x:Key="OwnMessageBrush" Color="#22423F"/>
+        <SolidColorBrush x:Key="SpeakingInkBrush" Color="#79E4C6"/>
+        <SolidColorBrush x:Key="SpeakingSurfaceBrush" Color="#193C34"/>
+        <SolidColorBrush x:Key="RoomVerificationCanvasBrush" Color="#291F20"/>
+        <SolidColorBrush x:Key="RoomVerificationSurfaceBrush" Color="#42282B"/>
+        <SolidColorBrush x:Key="RoomVerificationEdgeBrush" Color="#E29B92"/>
+        <LinearGradientBrush x:Key="RoomCoverBrush" StartPoint="0,0" EndPoint="1,0.8">
+          <GradientStop Color="#173638"/><GradientStop Color="#233C40" Offset="0.58"/><GradientStop Color="#253337" Offset="1"/>
+        </LinearGradientBrush>
+        <StaticResource x:Key="RoomRibbonBrush" ResourceKey="CoverRibbonBrush"/>
+        <StaticResource x:Key="BrandBrush" ResourceKey="AccentTextFillColorPrimaryBrush"/>
+        <SolidColorBrush x:Key="DangerBrush" Color="#FFADB9"/>
+        <SolidColorBrush x:Key="SignInTextBrush" Color="#F5FBF8"/>
+        <SolidColorBrush x:Key="SignInSecondaryBrush" Color="#C0DBD9"/>
+        <SolidColorBrush x:Key="Avatar0Fill" Color="#323D65"/>
+        <SolidColorBrush x:Key="Avatar0Ink" Color="#CDD7FF"/>
+        <SolidColorBrush x:Key="Avatar1Fill" Color="#244641"/>
+        <SolidColorBrush x:Key="Avatar1Ink" Color="#A1DDCB"/>
+        <SolidColorBrush x:Key="Avatar2Fill" Color="#47344F"/>
+        <SolidColorBrush x:Key="Avatar2Ink" Color="#E7BAF3"/>
+        <SolidColorBrush x:Key="Avatar3Fill" Color="#514036"/>
+        <SolidColorBrush x:Key="Avatar3Ink" Color="#ECD0B9"/>
+        <LinearGradientBrush x:Key="SignInBackdropBrush" StartPoint="0,0" EndPoint="1,1">
+          <GradientStop Color="#112A34"/><GradientStop Color="#184244" Offset="0.54"/><GradientStop Color="#102B31" Offset="1"/>
+        </LinearGradientBrush>
+        <SolidColorBrush x:Key="NavigationViewExpandedPaneBackground" Color="Transparent"/>
+        <SolidColorBrush x:Key="NavigationViewContentBackground" Color="Transparent"/>
+      </ResourceDictionary>
+      <ResourceDictionary x:Key="HighContrast">
+        <StaticResource x:Key="PageBrush" ResourceKey="SystemColorWindowBrush"/>
+        <StaticResource x:Key="PanelBrush" ResourceKey="SystemColorWindowBrush"/>
+        <StaticResource x:Key="SubtleBrush" ResourceKey="SystemColorWindowBrush"/>
+        <StaticResource x:Key="EdgeBrush" ResourceKey="SystemColorWindowTextBrush"/>
+        <StaticResource x:Key="InkBrush" ResourceKey="SystemColorWindowTextBrush"/>
+        <StaticResource x:Key="QuietBrush" ResourceKey="SystemColorWindowTextBrush"/>
+        <StaticResource x:Key="BrandBrush" ResourceKey="SystemColorHotlightBrush"/>
+        <StaticResource x:Key="DangerBrush" ResourceKey="SystemColorButtonTextBrush"/>
+        <StaticResource x:Key="SignInBackdropBrush" ResourceKey="SystemColorWindowBrush"/>
+        <StaticResource x:Key="OwnMessageBrush" ResourceKey="SystemColorWindowBrush"/>
+        <StaticResource x:Key="SpeakingInkBrush" ResourceKey="SystemColorHotlightBrush"/>
+        <StaticResource x:Key="SpeakingSurfaceBrush" ResourceKey="SystemColorWindowBrush"/>
+        <StaticResource x:Key="RoomVerificationCanvasBrush" ResourceKey="SystemColorWindowBrush"/>
+        <StaticResource x:Key="RoomVerificationSurfaceBrush" ResourceKey="SystemColorWindowBrush"/>
+        <StaticResource x:Key="RoomVerificationEdgeBrush" ResourceKey="SystemColorWindowTextBrush"/>
+        <StaticResource x:Key="RoomCoverBrush" ResourceKey="SystemColorWindowBrush"/>
+        <StaticResource x:Key="RoomRibbonBrush" ResourceKey="SystemColorWindowBrush"/>
+        <StaticResource x:Key="CoverRibbonBrush" ResourceKey="SystemColorWindowBrush"/>
+        <StaticResource x:Key="SignInTextBrush" ResourceKey="SystemColorWindowTextBrush"/>
+        <StaticResource x:Key="SignInSecondaryBrush" ResourceKey="SystemColorWindowTextBrush"/>
+        <StaticResource x:Key="Avatar0Fill" ResourceKey="SystemColorWindowBrush"/>
+        <StaticResource x:Key="Avatar0Ink" ResourceKey="SystemColorWindowTextBrush"/>
+        <StaticResource x:Key="Avatar1Fill" ResourceKey="SystemColorWindowBrush"/>
+        <StaticResource x:Key="Avatar1Ink" ResourceKey="SystemColorWindowTextBrush"/>
+        <StaticResource x:Key="Avatar2Fill" ResourceKey="SystemColorWindowBrush"/>
+        <StaticResource x:Key="Avatar2Ink" ResourceKey="SystemColorWindowTextBrush"/>
+        <StaticResource x:Key="Avatar3Fill" ResourceKey="SystemColorWindowBrush"/>
+        <StaticResource x:Key="Avatar3Ink" ResourceKey="SystemColorWindowTextBrush"/>
+        <StaticResource x:Key="NavigationViewContentBackground" ResourceKey="SystemColorWindowBrush"/>
+      </ResourceDictionary>
+    </ResourceDictionary.ThemeDictionaries>
+
+    <ControlTemplate x:Key="VoiceRibbon" TargetType="ContentControl">
+      <Viewbox Stretch="Fill">
+        <Canvas Width="480" Height="200">
+          <Path Fill="{TemplateBinding Foreground}" Opacity="0.09" Data="M0,130 C54,132 78,98 111,98 158,98 179,170 221,151 269,129 274,48 330,44 378,41 420,139 480,119 C404,74 357,149 302,147 259,146 251,62 208,49 160,36 165,113 117,130 81,141 60,133 0,130 Z"/>
+          <Path Stroke="{TemplateBinding Foreground}" StrokeThickness="1.05"
+                Data="M0,130 C54,132 78,98 111,98 158,98 179,170 221,151 269,129 274,48 330,44 378,41 420,139 480,119
+                  M0,130 C54,132 78,100 111,100 158,99 178,163 220,146 268,126 273,53 329,49 377,46 419,136 480,119
+                  M0,130 C55,132 78,102 112,101 159,100 177,157 220,141 267,122 273,58 327,54 376,52 418,133 480,119
+                  M0,130 C55,132 78,104 112,103 159,100 176,150 219,136 266,119 272,63 326,59 375,57 418,129 480,119
+                  M0,130 C55,132 79,107 112,104 159,101 175,143 218,131 265,116 271,68 324,65 374,63 417,126 480,119
+                  M0,130 C56,132 79,109 113,106 160,102 174,137 218,126 265,112 270,73 323,70 373,68 416,123 480,119
+                  M0,130 C56,132 79,111 113,108 160,103 173,130 217,120 264,109 270,77 322,75 372,73 415,120 480,119
+                  M0,130 C56,132 79,113 113,109 160,103 172,123 216,115 263,106 269,82 320,80 371,79 414,116 480,119
+                  M0,130 C56,132 79,115 113,111 161,104 171,116 216,110 262,102 268,87 319,85 370,84 414,113 480,119
+                  M0,130 C57,132 79,117 114,112 161,105 170,110 215,105 261,99 267,92 317,90 369,90 413,110 480,119
+                  M0,130 C57,133 80,120 114,114 162,106 170,103 215,100 260,96 267,97 316,96 368,95 412,107 480,119
+                  M0,130 C57,133 80,122 114,116 162,106 169,96 214,95 259,92 266,102 315,101 366,100 411,103 480,119
+                  M0,130 C58,133 80,124 115,117 162,107 168,90 213,90 258,89 265,107 313,106 365,106 410,100 480,119
+                  M0,130 C58,133 80,126 115,119 163,108 167,83 213,85 257,85 264,112 312,111 364,111 410,97 480,119
+                  M0,130 C58,133 80,128 115,120 163,109 166,76 212,80 256,82 264,117 310,116 363,117 409,94 480,119
+                  M0,130 C59,133 80,130 116,122 163,109 165,70 211,75 256,79 263,122 309,121 362,122 408,90 480,119
+                  M0,130 C59,133 80,132 116,124 164,110 164,63 211,69 255,75 262,126 308,126 361,127 407,87 480,119
+                  M0,130 C59,133 81,135 116,125 164,111 163,56 210,64 254,72 261,131 306,132 360,133 406,84 480,119
+                  M0,130 C59,133 81,137 116,127 164,112 162,49 209,59 253,69 261,136 305,137 359,138 406,81 480,119
+                  M0,130 C60,133 81,139 117,128 165,112 161,43 209,54 252,65 260,141 303,142 358,144 405,77 480,119
+                  M0,130 C60,133 81,141 117,130 165,113 160,36 208,49 251,62 259,146 302,147 357,149 404,74 480,119"/>
+        </Canvas>
+      </Viewbox>
+    </ControlTemplate>
+    <Style x:Key="ChirpRibbon" TargetType="ContentControl">
+      <Setter Property="Template" Value="{StaticResource VoiceRibbon}"/>
+      <Setter Property="IsTabStop" Value="False"/>
+      <Setter Property="IsHitTestVisible" Value="False"/>
+      <Setter Property="AutomationProperties.AccessibilityView" Value="Raw"/>
+    </Style>
+    <Style x:Key="ChirpBody" TargetType="TextBlock">
+      <Setter Property="Foreground" Value="{ThemeResource InkBrush}"/>
+      <Setter Property="TextWrapping" Value="Wrap"/>
+    </Style>
+    <Style x:Key="ChirpSecondary" TargetType="TextBlock" BasedOn="{StaticResource ChirpBody}">
+      <Setter Property="Foreground" Value="{ThemeResource QuietBrush}"/>
+    </Style>
+    <Style x:Key="ChirpHeading" TargetType="TextBlock" BasedOn="{StaticResource ChirpBody}">
+      <Setter Property="FontWeight" Value="SemiBold"/>
+      <Setter Property="FontSize" Value="20"/>
+    </Style>
+    <Style x:Key="ChirpCard" TargetType="Border">
+      <Setter Property="Background" Value="{ThemeResource PanelBrush}"/>
+      <Setter Property="BorderBrush" Value="{ThemeResource EdgeBrush}"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="Padding" Value="16"/>
+      <Setter Property="CornerRadius" Value="8"/>
+    </Style>
+    <Style x:Key="ChirpInset" TargetType="Border">
+      <Setter Property="Background" Value="{ThemeResource SubtleBrush}"/>
+      <Setter Property="CornerRadius" Value="6"/>
+    </Style>
+    <Style x:Key="ChirpDivider" TargetType="Border">
+      <Setter Property="Background" Value="{ThemeResource EdgeBrush}"/>
+      <Setter Property="Height" Value="1"/>
+    </Style>
+    <Style x:Key="ChirpMessage" TargetType="Border">
+      <Setter Property="Padding" Value="12,8"/>
+      <Setter Property="Background" Value="{ThemeResource SubtleBrush}"/>
+      <Setter Property="CornerRadius" Value="3,8,8,8"/>
+      <Setter Property="HorizontalAlignment" Value="Left"/>
+    </Style>
+    <Style x:Key="ChirpOwnMessage" TargetType="Border" BasedOn="{StaticResource ChirpMessage}">
+      <Setter Property="Background" Value="{ThemeResource OwnMessageBrush}"/>
+      <Setter Property="CornerRadius" Value="8,3,8,8"/>
+      <Setter Property="HorizontalAlignment" Value="Right"/>
+    </Style>
+    <Style x:Key="ChirpButton" TargetType="Button" BasedOn="{StaticResource DefaultButtonStyle}">
+      <Setter Property="MinHeight" Value="40"/>
+      <Setter Property="Padding" Value="12,6"/>
+    </Style>
+    <Style x:Key="ChirpPrimary" TargetType="Button" BasedOn="{StaticResource AccentButtonStyle}">
+      <Setter Property="MinHeight" Value="40"/>
+      <Setter Property="Padding" Value="14,6"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+    </Style>
+    <Style x:Key="ChirpToolbarButton" TargetType="Button" BasedOn="{StaticResource ChirpButton}">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="Padding" Value="8,6"/>
+    </Style>
+    <Style x:Key="ChirpLeaveButton" TargetType="Button" BasedOn="{StaticResource ChirpButton}">
+      <Setter Property="Foreground" Value="{ThemeResource DangerBrush}"/>
+    </Style>
+    <Style x:Key="ChirpRowButton" TargetType="Button" BasedOn="{StaticResource DefaultButtonStyle}">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="HorizontalAlignment" Value="Stretch"/>
+      <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+      <Setter Property="Padding" Value="12,9"/>
+      <Setter Property="MinHeight" Value="40"/>
+    </Style>
+    <Style x:Key="ChirpSurfaceButton" TargetType="Button" BasedOn="{StaticResource DefaultButtonStyle}">
+      <Setter Property="HorizontalAlignment" Value="Stretch"/>
+      <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+      <Setter Property="VerticalAlignment" Value="Stretch"/>
+      <Setter Property="Background" Value="{ThemeResource PanelBrush}"/>
+      <Setter Property="BorderBrush" Value="{ThemeResource EdgeBrush}"/>
+      <Setter Property="CornerRadius" Value="8"/>
+      <Setter Property="Padding" Value="12"/>
+    </Style>
+    <Style x:Key="ChirpSpeakingTile" TargetType="Button" BasedOn="{StaticResource ChirpSurfaceButton}">
+      <Setter Property="Background" Value="{ThemeResource SpeakingSurfaceBrush}"/>
+      <Setter Property="BorderBrush" Value="{ThemeResource SpeakingInkBrush}"/>
+      <Setter Property="BorderThickness" Value="2"/>
+      <Setter Property="Padding" Value="11"/>
+    </Style>
+    <Style x:Key="ChirpBrandIcon" TargetType="FontIcon">
+      <Setter Property="Foreground" Value="{ThemeResource BrandBrush}"/>
+    </Style>
+    <Style x:Key="ChirpAvatar0" TargetType="PersonPicture">
+      <Setter Property="Background" Value="{ThemeResource Avatar0Fill}"/>
+      <Setter Property="Foreground" Value="{ThemeResource Avatar0Ink}"/>
+    </Style>
+    <Style x:Key="ChirpAvatar1" TargetType="PersonPicture">
+      <Setter Property="Background" Value="{ThemeResource Avatar1Fill}"/>
+      <Setter Property="Foreground" Value="{ThemeResource Avatar1Ink}"/>
+    </Style>
+    <Style x:Key="ChirpAvatar2" TargetType="PersonPicture">
+      <Setter Property="Background" Value="{ThemeResource Avatar2Fill}"/>
+      <Setter Property="Foreground" Value="{ThemeResource Avatar2Ink}"/>
+    </Style>
+    <Style x:Key="ChirpAvatar3" TargetType="PersonPicture">
+      <Setter Property="Background" Value="{ThemeResource Avatar3Fill}"/>
+      <Setter Property="Foreground" Value="{ThemeResource Avatar3Ink}"/>
+    </Style>
+  </ResourceDictionary>
+  </Application.Resources>
+</Application>

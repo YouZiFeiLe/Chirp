@@ -1,0 +1,7 @@
+<resources>
+    <color name="chirp_canvas_light">#F4F6F2</color>
+    <color name="chirp_canvas_dark">#101B17</color>
+    <color name="chirp_accent_light">#246448</color>
+    <color name="chirp_accent_dark">#A9DAB5</color>
+    <color name="launcher_green">#38644F</color>
+</resources>

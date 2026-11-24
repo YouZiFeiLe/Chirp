@@ -1,0 +1,333 @@
+diff --git a/Sources/LiveKit/Core/DataChannelDrain.swift b/Sources/LiveKit/Core/DataChannelDrain.swift
+index 262557b..3efd48a 100644
+--- a/Sources/LiveKit/Core/DataChannelDrain.swift
++++ b/Sources/LiveKit/Core/DataChannelDrain.swift
+@@ -95,7 +95,7 @@ final class DataChannelDrain<Stage: SendStage>: NSObject, LKRTCDataChannelDelega
+ 
+     private enum Event {
+         /// Work to prepare and queue.
+-        case submitted(Stage.Input, CheckedContinuation<Void, any Error>?)
++        case submitted(Stage.Input, CheckedContinuation<Void, any Error>?, (@Sendable () -> Bool)?)
+         case commanded(Stage.Command)
+         case drained(UInt64)
+         /// A channel was attached or swapped: the mirror starts over, and under
+@@ -213,8 +213,9 @@ final class DataChannelDrain<Stage: SendStage>: NSObject, LKRTCDataChannelDelega
+     /// rather than stranded.
+     /// - Warning: Cancelling the submitting task does **not** withdraw a queued write; it stays
+     ///   queued until the channel takes it or ``reset(throwing:)`` fails it.
+-    func submit(_ input: Stage.Input, continuation: CheckedContinuation<Void, any Error>? = nil) {
+-        eventContinuation.yield(.submitted(input, continuation))
++    func submit(_ input: Stage.Input, continuation: CheckedContinuation<Void, any Error>? = nil,
++                chirpAuthorization: (@Sendable () -> Bool)? = nil) {
++        eventContinuation.yield(.submitted(input, continuation, chirpAuthorization))
+     }
+ 
+     /// Submits work and suspends until its last write reaches the channel (or it is dropped,
+@@ -222,9 +223,26 @@ final class DataChannelDrain<Stage: SendStage>: NSObject, LKRTCDataChannelDelega
+     /// that need an await use this rather than re-deriving the wrapping — and the awaited `self`
+     /// keeps the drain alive for the write's whole lifetime, which the raw entry point requires of
+     /// its callers.
+-    func send(_ input: Stage.Input) async throws {
+-        try await withCheckedThrowingContinuation { continuation in
+-            submit(input, continuation: continuation)
++    func send(_ input: Stage.Input, chirpAuthorization: (@Sendable () -> Bool)? = nil) async throws {
++        guard let chirpAuthorization else {
++            try await withCheckedThrowingContinuation { continuation in
++                submit(input, continuation: continuation)
++            }
++            return
++        }
++        // Cancellation belongs to the submitting task, not this drain's loop.
++        // Keep that fact with the bytes, including reliable replay copies.
++        let cancelled = StateSync(false)
++        try await withTaskCancellationHandler {
++            try Task.checkCancellation()
++            try await withCheckedThrowingContinuation { continuation in
++                submit(input, continuation: continuation, chirpAuthorization: {
++                    !cancelled.read { $0 } && chirpAuthorization()
++                })
++            }
++        } onCancel: {
++            cancelled.mutate { $0 = true }
++            eventContinuation.yield(.wakeup)
+         }
+     }
+ 
+@@ -263,8 +281,8 @@ final class DataChannelDrain<Stage: SendStage>: NSObject, LKRTCDataChannelDelega
+ 
+     private func process(_ event: Event, state: inout LoopState) {
+         switch event {
+-        case let .submitted(input, continuation):
+-            enqueue(input, continuation: continuation, state: &state)
++        case let .submitted(input, continuation, authorization):
++            enqueue(input, continuation: continuation, authorization: authorization, state: &state)
+         case let .commanded(command):
+             // Replays append synchronously, inside this event: routing them back through the
+             // stream would let a concurrent reset()'s .fail land between two replays, re-queueing
+@@ -309,8 +327,13 @@ final class DataChannelDrain<Stage: SendStage>: NSObject, LKRTCDataChannelDelega
+     private func enqueue(
+         _ input: Stage.Input,
+         continuation: CheckedContinuation<Void, any Error>?,
++        authorization: (@Sendable () -> Bool)?,
+         state: inout LoopState,
+     ) {
++        guard authorization?() != false else {
++            continuation?.resume(throwing: LiveKitError(.encryptionFailed, message: "Encrypted sending authorization expired"))
++            return
++        }
+         state.scratch.removeAll(keepingCapacity: true)
+         do {
+             try state.stage.prepare(input, into: &state.scratch)
+@@ -343,6 +366,7 @@ final class DataChannelDrain<Stage: SendStage>: NSObject, LKRTCDataChannelDelega
+                 into: &state.writes,
+                 continuation: continuation,
+                 maxMessageSize: state.maxMessageSize,
++                chirpAuthorization: authorization,
+             )
+         } catch {
+             continuation?.resume(throwing: error)
+@@ -379,6 +403,14 @@ final class DataChannelDrain<Stage: SendStage>: NSObject, LKRTCDataChannelDelega
+     /// signaling timeouts, and a dedicated executor for the drains is the eventual fix if pool
+     /// starvation is ever observed.
+     private func dispatch(state: inout LoopState) {
++        // A cancelled reliable chat must finish even while the channel is
++        // closed or backpressured. Ordinary SDK sends retain their policy.
++        if case .park = overflow {
++            while let write = state.queue.next, write.chirpAuthorization?() == false {
++                state.queue.advance()
++                write.settle(with: .failure(LiveKitError(.encryptionFailed, message: "Encrypted sending authorization expired")))
++            }
++        }
+         while state.meter.hasHeadroom {
+             // Readiness before promotion: while the channel is still opening, a queued group must
+             // stay in the evictable `pending` slot so a newer group can still replace it —
+@@ -400,6 +432,15 @@ final class DataChannelDrain<Stage: SendStage>: NSObject, LKRTCDataChannelDelega
+             }
+             state.queue.promoteIfIdle()
+             guard let write = state.queue.next else { return }
++            // Re-check at the actual transport boundary, also on replay. Bytes
++            // queued under an old lease/provider must never cross a new round.
++            guard write.chirpAuthorization?() != false else {
++                let failure = LiveKitError(.encryptionFailed, message: "Encrypted sending authorization expired")
++                state.queue.advance()
++                write.settle(with: .failure(failure))
++                dropFailedWrite(state: &state, throwing: failure)
++                continue
++            }
+             state.meter.willSend(write.byteCount)
+ 
+             guard channel.send(write.payload) else {
+diff --git a/Sources/LiveKit/Core/DataChannelPair.swift b/Sources/LiveKit/Core/DataChannelPair.swift
+index f531d1e..46b68cc 100644
+--- a/Sources/LiveKit/Core/DataChannelPair.swift
++++ b/Sources/LiveKit/Core/DataChannelPair.swift
+@@ -168,17 +168,31 @@ class DataChannelPair: NSObject, @unchecked Sendable, Loggable {
+         })
+     }
+ 
+-    func send(dataPacket packet: consuming Livekit_DataPacket) async throws {
++    func send(dataPacket packet: consuming Livekit_DataPacket,
++              chirpKeyProvider: BaseKeyProvider? = nil,
++              chirpAuthorization: (@Sendable () -> Bool)? = nil) async throws {
+         // Encrypt off the event loop: CPU work that doesn't touch ordering.
+-        let encryptedPacket = try withEncryption(packet)
++        let encryptedPacket: Livekit_DataPacket
++        if let chirpKeyProvider {
++            encryptedPacket = try chirpEncrypt(packet, using: chirpKeyProvider,
++                                               authorization: chirpAuthorization)
++        } else {
++            encryptedPacket = try withEncryption(packet)
++        }
+         let isLossy = encryptedPacket.kind == .lossy // TODO: field is deprecated
++        let sendAuthorization: (@Sendable () -> Bool)?
++        if let provider = chirpKeyProvider {
++            sendAuthorization = { @Sendable in !provider.chirpIsRetired && chirpAuthorization?() == true }
++        } else {
++            sendAuthorization = nil
++        }
+ 
+         // Serialization and sequence assignment happen inside the drain, so the sequence on the
+         // wire matches the FIFO order in which writes reach `sendData`.
+         if isLossy {
+-            try await lossy.send(encryptedPacket)
++            try await lossy.send(encryptedPacket, chirpAuthorization: sendAuthorization)
+         } else {
+-            try await reliable.send(encryptedPacket)
++            try await reliable.send(encryptedPacket, chirpAuthorization: sendAuthorization)
+         }
+     }
+ 
+@@ -195,6 +209,25 @@ class DataChannelPair: NSObject, @unchecked Sendable, Loggable {
+         return packet.modifying { $0.encryptedPacket = encrypted }
+     }
+ 
++    // The caller's admission/epoch must survive publisher negotiation. Never
++    // silently use a later provider or the generic plaintext fallback.
++    func chirpEncrypt(_ packet: Livekit_DataPacket, using provider: BaseKeyProvider,
++                      authorization: (@Sendable () -> Bool)?) throws -> Livekit_DataPacket {
++        try Task.checkCancellation()
++        guard authorization?() == true,
++              let manager = _state.e2eeManager, manager.dataChannelEncryptionType == .gcm,
++              let payload = Livekit_EncryptedPacketPayload(dataPacket: packet) else {
++            throw LiveKitError(.encryptionFailed, message: "Encrypted sending authorization is unavailable")
++        }
++        let encrypted = try manager.chirpEncrypt(data: payload.serializedData(),
++                                                participantIdentity: packet.participantIdentity, using: provider)
++        let result = packet.modifying { $0.encryptedPacket = Livekit_EncryptedPacket(rtcPacket: encrypted) }
++        guard try result.serializedData().count <= 15 * 1024 else {
++            throw LiveKitError(.invalidParameter, message: "Encrypted data packet is too large")
++        }
++        return result
++    }
++
+     func retryReliable(lastSequence: UInt32) {
+         reliable.submit(command: .replay(after: lastSequence))
+     }
+@@ -240,6 +273,11 @@ class DataChannelPair: NSObject, @unchecked Sendable, Loggable {
+             let decryptedData = try e2eeManager.handle(encryptedData: encryptedPacket.toRTCEncryptedPacket(), participantIdentity: dataPacket.participantIdentity)
+             let decryptedPayload = try Livekit_EncryptedPacketPayload(serializedBytes: decryptedData)
+ 
++            if case let .user(user) = decryptedPayload.value,
++               user.participantIdentity != dataPacket.participantIdentity {
++                throw LiveKitError(.decryptionFailed, message: "Encrypted sender identity mismatch")
++            }
++
+             let decrypted = dataPacket.modifying { decryptedPayload.applyTo(&$0) }
+ 
+             delegates.notify { [decrypted] in
+diff --git a/Sources/LiveKit/Core/DataChannelWrite.swift b/Sources/LiveKit/Core/DataChannelWrite.swift
+index 379a1cc..73aca2b 100644
+--- a/Sources/LiveKit/Core/DataChannelWrite.swift
++++ b/Sources/LiveKit/Core/DataChannelWrite.swift
+@@ -94,11 +94,14 @@ struct ReadyWrite {
+     let payload: Data
+     let sequence: UInt32
+     let token: SendToken?
++    let chirpAuthorization: (@Sendable () -> Bool)?
+ 
+-    init(payload: Data, sequence: UInt32, token: SendToken? = nil) {
++    init(payload: Data, sequence: UInt32, token: SendToken? = nil,
++         chirpAuthorization: (@Sendable () -> Bool)? = nil) {
+         self.payload = payload
+         self.sequence = sequence
+         self.token = token
++        self.chirpAuthorization = chirpAuthorization
+     }
+ 
+     var byteCount: Int { payload.count }
+@@ -117,14 +120,17 @@ struct RetainedWrite {
+     let payload: Data
+     let sequence: UInt32
+ 
++    let chirpAuthorization: (@Sendable () -> Bool)?
++
+     init(_ write: ReadyWrite) {
+         payload = write.payload
+         sequence = write.sequence
++        chirpAuthorization = write.chirpAuthorization
+     }
+ 
+     /// Re-enters the queue with no waiter to resume.
+     var replayed: ReadyWrite {
+-        ReadyWrite(payload: payload, sequence: sequence)
++        ReadyWrite(payload: payload, sequence: sequence, chirpAuthorization: chirpAuthorization)
+     }
+ }
+ 
+@@ -143,6 +149,7 @@ func makeWrites(
+     into group: inout [ReadyWrite],
+     continuation: CheckedContinuation<Void, any Error>?,
+     maxMessageSize: UInt64,
++    chirpAuthorization: (@Sendable () -> Bool)? = nil,
+ ) throws {
+     group.removeAll(keepingCapacity: true)
+     group.reserveCapacity(prepared.count)
+@@ -158,6 +165,7 @@ func makeWrites(
+             payload: bytes.bytes,
+             sequence: bytes.sequence,
+             token: index == prepared.count - 1 ? continuation.map(SendToken.init) : nil,
++            chirpAuthorization: chirpAuthorization,
+         ))
+     }
+ }
+diff --git a/Sources/LiveKit/Core/Room+EngineDelegate.swift b/Sources/LiveKit/Core/Room+EngineDelegate.swift
+index f3edcc2..f3834d2 100644
+--- a/Sources/LiveKit/Core/Room+EngineDelegate.swift
++++ b/Sources/LiveKit/Core/Room+EngineDelegate.swift
+@@ -209,12 +209,12 @@ extension Room {
+         let participant = _state.remoteParticipants[identity]
+ 
+         if case .connected = engine._state.connectionState {
+-            delegates.notify(label: { "room.didReceive data: \(packet.payload)" }) {
++            delegates.notify(label: { "room.didReceive data (payload redacted)" }) {
+                 $0.room?(self, participant: participant, didReceiveData: packet.payload, forTopic: packet.topic, encryptionType: encryptionType)
+             }
+ 
+             if let participant {
+-                participant.delegates.notify(label: { "participant.didReceive data: \(packet.payload)" }) { [weak participant] delegate in
++                participant.delegates.notify(label: { "participant.didReceive data (payload redacted)" }) { [weak participant] delegate in
+                     guard let participant else { return }
+                     delegate.participant?(participant, didReceiveData: packet.payload, forTopic: packet.topic, encryptionType: encryptionType)
+                 }
+diff --git a/Sources/LiveKit/E2EE/E2EEManager.swift b/Sources/LiveKit/E2EE/E2EEManager.swift
+index 8fff8ec..b79709a 100644
+--- a/Sources/LiveKit/E2EE/E2EEManager.swift
++++ b/Sources/LiveKit/E2EE/E2EEManager.swift
+@@ -461,6 +461,21 @@ extension E2EEManager: RoomDelegate {
+ // MARK: - Data Packet encryption
+ 
+ extension E2EEManager {
++    func chirpEncrypt(data: Data, participantIdentity: String, using provider: BaseKeyProvider) throws -> LKRTCEncryptedPacket {
++        try _state.read { state in
++            // Resolving the provider from state avoids recursive locking and
++            // pins the cryptor/provider pair while encryption is performed.
++            guard state.enabled, options?.encryptionType == .gcm,
++                  chirpKeyProvider(for: state) === provider, !provider.chirpIsRetired,
++                  let cryptor = state.dataCryptor, !participantIdentity.isEmpty,
++                  let encrypted = cryptor.encrypt(participantIdentity,
++                                                 keyIndex: UInt32(provider.getCurrentKeyIndex()), data: data) else {
++                throw LiveKitError(.encryptionFailed, message: "Encrypted sending key is no longer current")
++            }
++            return encrypted
++        }
++    }
++
+     func encrypt(data: Data) throws -> LKRTCEncryptedPacket {
+         guard let room = _room,
+               let identity = room.localParticipant.identity?.stringValue
+diff --git a/Sources/LiveKit/Participant/LocalParticipant.swift b/Sources/LiveKit/Participant/LocalParticipant.swift
+index 196edb5..85db654 100644
+--- a/Sources/LiveKit/Participant/LocalParticipant.swift
++++ b/Sources/LiveKit/Participant/LocalParticipant.swift
+@@ -1022,3 +1022,31 @@ extension LocalParticipant {
+         !_internalState.enabledPublishVideoCodecs.isEmpty
+     }
+ }
++
++
++extension LocalParticipant {
++    /// An encrypted-only send pinned to the caller's original key provider and
++    /// short authorization. Publisher negotiation cannot move it into a new epoch.
++    public func chirpPublishEncrypted(data: Data, topic: String, destinations: [Participant.Identity],
++                                      keyProvider: BaseKeyProvider, authorization: @escaping @Sendable () -> Bool) async throws {
++        let room = try requireRoom()
++        try await room.ensureDataChannelReady(kind: .reliable)
++        try Task.checkCancellation()
++        guard room.connectionState == .connected, let identity, let sid, !destinations.isEmpty else {
++            throw LiveKitError(.invalidState, message: "Encrypted sending identity is unavailable")
++        }
++        let packet = Livekit_DataPacket.with {
++            $0.kind = .reliable
++            $0.participantIdentity = identity.stringValue
++            $0.participantSid = sid.stringValue
++            $0.destinationIdentities = destinations.map(\.stringValue)
++            $0.user = .with {
++                $0.participantIdentity = identity.stringValue
++                $0.topic = topic
++                $0.payload = data
++            }
++        }
++        try await room.publisherDataChannel.send(dataPacket: packet, chirpKeyProvider: keyProvider,
++                                                  chirpAuthorization: authorization)
++    }
++}

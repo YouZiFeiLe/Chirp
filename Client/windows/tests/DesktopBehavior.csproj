@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net11.0-windows10.0.26100.0</TargetFramework>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../Chirp/DesktopState.cs" Link="DesktopState.cs" />
+    <Compile Include="../Chirp/BackupConfirmationClock.cs" Link="BackupConfirmationClock.cs" />
+    <Compile Include="../Chirp/NetworkClock.cs" Link="NetworkClock.cs" />
+    <Compile Include="../Chirp/MemberProfiles.cs" Link="MemberProfiles.cs" />
+    <Compile Include="../Chirp/ProtocolClient.cs" Link="ProtocolClient.cs" />
+    <Compile Include="../Chirp/PngFrames.cs" Link="PngFrames.cs" />
+    <Compile Include="../Chirp/ChatTimeline.cs" Link="ChatTimeline.cs" />
+    <Compile Include="../Chirp/AttachmentStatus.cs" Link="AttachmentStatus.cs" />
+    <Compile Include="../Chirp/Images.cs" Link="Images.cs" />
+    <Compile Include="../Chirp/AvatarImage.cs" Link="AvatarImage.cs" />
+    <Compile Include="../Chirp/PairingImages.cs" Link="PairingImages.cs" />
+    <None Update="Fixtures/pairing-animated.png" CopyToOutputDirectory="PreserveNewest" />
+    <PackageReference Include="ZXing.Net" />
+    <PackageReference Include="QRCoder" />
+    <Compile Include="../Chirp/AudioService.cs" Link="AudioService.cs" />
+    <Compile Include="../Chirp/CaptureProcessing.cs" Link="CaptureProcessing.cs" />
+    <Content Include="../../apple/Shared/Resources/Sounds/*.mp3" Link="Sounds/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <PackageReference Include="NAudio.Wasapi" />
+    <PackageReference Include="Concentus" />
+    <PackageReference Include="OpusSharp.Natives" />
+  </ItemGroup>
+</Project>

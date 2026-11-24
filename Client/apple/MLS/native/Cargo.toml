@@ -1,0 +1,31 @@
+[package]
+name = "chirp-mls-native"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["staticlib", "rlib"]
+
+[dependencies]
+openmls = "=0.9.2"
+openmls_basic_credential = "0.6.0"
+openmls_rust_crypto = "0.6.0"
+openmls_traits = "0.6.0"
+tls_codec = "0.5.0"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+base64 = "0.23.1"
+zeroize = "1.9.2"
+ed25519-dalek = "3.0.0"
+sha2 = "0.11.1"
+
+aes-gcm = { version = "=0.11.1", features = ["zeroize"] }
+argon2 = { version = "=0.6.0", default-features = false, features = ["alloc", "zeroize"] }
+vodozemac = "=0.11.2"
+getrandom = "=0.4.3"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = "debuginfo"

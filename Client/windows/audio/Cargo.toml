@@ -1,0 +1,11 @@
+[package]
+name = "chirp_windows_audio"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+sonora = "=0.3.0"

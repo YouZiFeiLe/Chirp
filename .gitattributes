@@ -1,0 +1,4 @@
+# Unified diff context lines intentionally contain a space, including at EOF.
+*.patch whitespace=-blank-at-eol,-blank-at-eof
+scripts/publish-open-source.sh text eol=lf
+scripts/test-open-source-compose.sh text eol=lf

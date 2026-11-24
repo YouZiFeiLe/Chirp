@@ -1,0 +1,123 @@
+/* Chirp Together — shared with design-system/chirp-together/design-tokens.json. */
+:root {
+  color-scheme: light dark;
+  --canvas: #f4f6f2;
+  --surface: #ffffff;
+  --surface-subtle: #e8f0e7;
+  --hero: #e2eee2;
+  --on-danger: #ffffff;
+  --shadow-card: 0 16px 48px #17312208;
+  --border: #d5ded3;
+  --ink: #1c3028;
+  --secondary: #5c6d62;
+  --accent: #246448;
+  --on-accent: #ffffff;
+  --danger: #af403d;
+  --warning: #805820;
+  --avatar-sage: #e4ebde;
+  --avatar-sage-ink: #47603e;
+  --avatar-sand: #ebe5dd;
+  --avatar-sand-ink: #77604a;
+  --avatar-mist: #e5e7ed;
+  --avatar-mist-ink: #56617b;
+  --avatar-clay: #ece3e2;
+  --avatar-clay-ink: #815a55;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --radius-control: 14px;
+  --radius-card: 24px;
+  --radius-hero: 32px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  color: var(--ink);
+  background: var(--canvas);
+  font-synthesis: none;
+  -webkit-font-smoothing: antialiased;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --canvas: #101b17;
+    --surface: #192a23;
+    --surface-subtle: #223a2e;
+    --hero: #213c2d;
+    --on-danger: #44211d;
+    --shadow-card: 0 16px 48px #00000020;
+    --border: #365044;
+    --ink: #edf4eb;
+    --secondary: #aec2b4;
+    --accent: #a9dab5;
+    --on-accent: #123721;
+    --danger: #ffb4a8;
+    --warning: #e3c08c;
+    --avatar-sage: #334530;
+    --avatar-sage-ink: #bdd0b2;
+    --avatar-sand: #463c31;
+    --avatar-sand-ink: #d6c2aa;
+    --avatar-mist: #363b4b;
+    --avatar-mist-ink: #bdc6de;
+    --avatar-clay: #4a3534;
+    --avatar-clay-ink: #dcbdb7;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; font-size: 16px; line-height: 1.65; }
+h1, h2, h3, p { margin: 0; }
+h1, h2, h3 { font-weight: 650; line-height: 1.3; text-wrap: balance; letter-spacing: -.025em; }
+a { color: inherit; text-decoration: none; }
+button, input, select, textarea { font: inherit; }
+button, a, input, select { -webkit-tap-highlight-color: transparent; }
+button, a { touch-action: manipulation; }
+button { cursor: pointer; }
+button:disabled, input:disabled, select:disabled { cursor: not-allowed; opacity: .5; }
+button, a, input, select, textarea { outline-offset: 4px; }
+:focus-visible { outline: 2px solid var(--accent); }
+::selection { background: var(--accent); color: var(--on-accent); }
+[hidden] { display: none !important; }
+svg.icon { width: 20px; height: 20px; flex: none; display: block; fill: none; stroke: currentColor; stroke-width: 1.65; stroke-linecap: round; stroke-linejoin: round; }
+[data-icon] { display: inline-flex; align-items: center; flex: none; }
+.brand { display: inline-flex; align-items: center; gap: 12px; }
+.brand img { width: 44px; height: 44px; flex: none; }
+.brand-wordmark { font-size: 26px; font-weight: 650; letter-spacing: -.9px; line-height: 1.15; }
+.eyebrow, .step-label { color: var(--secondary); font-size: 12px; font-weight: 650; letter-spacing: .10em; }
+.button, button.primary, button.secondary, a.primary, a.secondary {
+  min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 10px 20px; border: 1px solid transparent; border-radius: var(--radius-control);
+  font-size: 14px; font-weight: 600; line-height: 1.5;
+  transition: background-color .18s, border-color .18s, box-shadow .18s, color .18s;
+}
+.primary { color: var(--on-accent); background: var(--accent); }
+.secondary { color: var(--ink); background: var(--surface); border-color: var(--border) !important; }
+.danger { background: var(--danger); color: var(--on-danger); }
+.danger-outline { color: var(--danger); background: transparent; border-color: color-mix(in srgb, var(--danger) 40%, var(--border)); }
+.primary:hover:not(:disabled) { box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 18%, transparent); background: color-mix(in srgb, var(--accent), var(--ink) 12%); }
+.secondary:hover:not(:disabled), .danger-outline:hover:not(:disabled) { background: var(--surface-subtle); }
+.danger:hover:not(:disabled) { background: color-mix(in srgb, var(--danger), var(--ink) 12%); }
+.text-input, input:not([type="checkbox"]):not([type="radio"]) { color: var(--ink); }
+input::placeholder { color: var(--secondary); opacity: 1; }
+.skip-link { position: fixed; z-index: 100; top: 12px; left: 12px; transform: translateY(-180%); padding: 12px 20px; border-radius: var(--radius-control); background: var(--accent); color: var(--on-accent); }
+.skip-link:focus { transform: none; }
+[data-i18n-lines] { white-space: pre-line; }
+.language-picker { display: inline-flex; align-items: center; gap: 8px; margin: 0; color: var(--secondary); font-size: 12px; font-weight: 400; flex: none; }
+.language-picker select { min-height: 44px; max-width: 170px; padding: 8px 28px 8px 12px; border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface); color: var(--ink); font-size: 13px; }
+/* Decorative, static voice motif; never used as a live meter. */
+.quiet-wave { width: 184px; aspect-ratio: 1; position: relative; display: grid; place-items: center; color: var(--accent); }
+.quiet-wave::before, .quiet-wave::after { content: ""; position: absolute; border: 1px solid color-mix(in srgb, var(--accent) 18%, transparent); border-radius: 50%; inset: 0; }
+.quiet-wave::after { inset: 21px; }
+.quiet-wave svg { width: 56%; height: 56%; padding: 20px; overflow: visible; background: color-mix(in srgb, var(--surface) 65%, transparent); border-radius: 50%; }
+.eyebrow { display: flex; align-items: center; gap: 10px; color: var(--accent); }
+.eyebrow::before { content: ""; width: 20px; height: 3px; flex: none; border-radius: 2px; background: currentColor; }
+button:active:not(:disabled), a.button:active { filter: brightness(.96); }
+input[aria-invalid="true"], .text-input[aria-invalid="true"] { border-color: var(--danger); }
+button[aria-busy="true"]::before { content: ""; width: 16px; height: 16px; flex: none; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: chirp-spin .8s linear infinite; }
+button[aria-busy="true"] > [aria-hidden="true"] { display: none; }
+@keyframes chirp-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
+}
+@media (forced-colors: active) {
+  .primary, .secondary, .danger, .danger-outline, .pill, .nav a.active { border: 1px solid ButtonText; }
+}

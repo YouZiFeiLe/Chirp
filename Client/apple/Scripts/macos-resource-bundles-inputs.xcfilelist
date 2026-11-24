@@ -1,0 +1,8 @@
+# These are the complete codeless bundle resources inspected by the build script.
+# Update this list if a package adds resources; keep build script sandboxing on.
+$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/ChirpAudio_ChirpAudio.bundle/Contents/Info.plist
+$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/ChirpAudio_ChirpAudio.bundle/Contents/Resources/RNNoise-LICENSE.txt
+$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/ChirpMLS_ChirpMLS.bundle/Contents/Info.plist
+$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/ChirpMLS_ChirpMLS.bundle/Contents/Resources/ThirdPartyNotices.txt
+$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/LiveKit_LiveKit.bundle/Contents/Info.plist
+$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/LiveKit_LiveKit.bundle/Contents/Resources/PrivacyInfo.xcprivacy

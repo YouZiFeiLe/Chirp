@@ -1,0 +1,199 @@
+name: chirp
+services:
+  app:
+    image: ${CHIRP_IMAGE:-docker.io/youzifeile/chirp-server:latest}
+    platform: linux/amd64
+    environment:
+      CHIRP_PUBLIC_ORIGIN: ${CHIRP_PUBLIC_ORIGIN:-http://localhost:18115}
+      CHIRP_DATABASE_PATH: /data/chirp.db
+      CHIRP_AUTHORIZATION_DATABASE_PATH: /data/authorization.db
+      CHIRP_ATTACHMENT_PATH: /data/attachments
+      CHIRP_AUTHORIZATION_KEY_FILE: /usr/share/chirp/authorization-key.default
+      CHIRP_LOG_LEVEL: ${CHIRP_LOG_LEVEL:-info}
+      CHIRP_LOG_SERVER_ENABLED: ${CHIRP_LOG_SERVER_ENABLED:-false}
+      CHIRP_LOG_SERVER_URL: ${CHIRP_LOG_SERVER_URL:-}
+      CHIRP_TOKEN_TTL: ${CHIRP_TOKEN_TTL:-5m}
+      CHIRP_GROUP_ROTATION: ${CHIRP_GROUP_ROTATION:-60s}
+      LIVEKIT_HTTP_URL: http://livekit:7880
+      LIVEKIT_API_KEY: chirp
+      CHIRP_LIVEKIT_KEYS_FILE: /var/lib/chirp-media/keys.json
+    volumes:
+      - data:/data
+      - logs:/app/log
+      - media-keys:/var/lib/chirp-media
+    ports:
+      - "${CHIRP_HTTP_PUBLISH_IP:-127.0.0.1}:18115:18115/tcp"
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 256
+    tmpfs: ["/tmp:rw,noexec,nosuid,nodev,size=32m,mode=1777"]
+    stop_grace_period: 20s
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/chirp", "healthcheck"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
+
+  livekit:
+    image: docker.io/livekit/livekit-server:v1.13.11
+    platform: linux/amd64
+    user: "65532:65532"
+    depends_on:
+      app:
+        condition: service_healthy
+    environment:
+      LIVEKIT_CONFIG: |
+        port: 7880
+        bind_addresses: ["0.0.0.0"]
+        key_file: /var/lib/chirp-media/keys.json
+        rtc:
+          udp_port: 7882
+          port_range_start: 0
+          port_range_end: 0
+          tcp_port: 0
+          use_external_ip: false
+          node_ip: "${CHIRP_RTC_NODE_IP:-}"
+          allow_tcp_fallback: false
+          allow_udp_unstable_fallback: false
+        room:
+          max_participants: 0
+          enabled_codecs:
+            - mime: audio/opus
+            - mime: audio/red
+        turn:
+          enabled: false
+    volumes:
+      - media-keys:/var/lib/chirp-media:ro
+    ports:
+      - "${CHIRP_HTTP_PUBLISH_IP:-127.0.0.1}:7880:7880/tcp"
+      - "7882:7882/udp"
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 512
+    tmpfs: ["/tmp:rw,noexec,nosuid,nodev,size=32m,mode=1777"]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:7880/"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+
+  nginx:
+    image: docker.io/linuxserver/swag:5.10.0-ls503
+    platform: linux/amd64
+    profiles: [https]
+    depends_on:
+      app:
+        condition: service_healthy
+      livekit:
+        condition: service_healthy
+    environment:
+      URL: ${CHIRP_DOMAIN:-}
+      EMAIL: ${CHIRP_ACME_EMAIL:-}
+      VALIDATION: ${CHIRP_ACME_METHOD:-http}
+      DNSPLUGIN: ${CHIRP_DNS_PLUGIN:-cloudflare}
+      DISABLE_F2B: "true"
+      PUID: "65532"
+      PGID: "65532"
+    ports:
+      - "${CHIRP_NGINX_HTTP_BIND:-0.0.0.0:80}:80/tcp"
+      - "443:443/tcp"
+    volumes:
+      - ./secrets/swag:/config
+    configs:
+      - source: nginx_site
+        target: /config/nginx/site-confs/default.conf
+      - source: nginx_http_pre_hook
+        target: /defaults/etc/letsencrypt/renewal-hooks/pre/20-wait-for-nginx
+        mode: 0555
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", 'curl --noproxy "*" -fsS --resolve "$$URL:443:127.0.0.1" "https://$$URL/healthz" > /dev/null']
+      interval: 10s
+      timeout: 4s
+      retries: 12
+      start_period: 5m
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+
+configs:
+  nginx_http_pre_hook:
+    content: |
+      #!/usr/bin/with-contenv sh
+      # SWAG's first pre-hook signals Nginx. Wait for port 80 before Certbot binds it.
+      service=/run/service/svc-nginx
+      if [ "$$VALIDATION" = http ] && [ -p "$$service/supervise/control" ]; then
+          s6-svc -wd -T 30000 -d "$$service"
+      fi
+
+  nginx_site:
+    content: |
+      map $$http_upgrade $$chirp_connection {
+          default upgrade;
+          '' close;
+      }
+      limit_req_zone $$binary_remote_addr zone=chirp_authorization:10m rate=10r/s;
+
+      server {
+          listen 80 default_server;
+          server_name _;
+          return 301 https://${CHIRP_DOMAIN:-localhost}$$request_uri;
+      }
+      server {
+          listen 443 ssl default_server;
+          server_name ${CHIRP_DOMAIN:-localhost};
+          # The HTTP challenge hook may start Nginx before SWAG replaces its bootstrap certificate.
+          ssl_certificate /config/keys/letsencrypt/fullchain.pem;
+          ssl_certificate_key /config/keys/letsencrypt/privkey.pem;
+          ssl_protocols TLSv1.2 TLSv1.3;
+          ssl_ciphers ECDHE+AESGCM:ECDHE+CHACHA20;
+          ssl_session_cache shared:ChirpSSL:10m;
+          add_header Strict-Transport-Security "max-age=63072000" always;
+          resolver 127.0.0.11 valid=10s ipv6=off;
+          set $$chirp_app app:18115;
+          set $$chirp_rtc livekit:7880;
+          proxy_http_version 1.1;
+          proxy_buffering off;
+          proxy_set_header Host $$host;
+          proxy_set_header X-Forwarded-Proto $$scheme;
+          proxy_set_header X-Real-IP $$remote_addr;
+          client_max_body_size 5m;
+
+          location ~ ^/rtc(?:/|$) {
+              access_log off;
+              proxy_pass http://$$chirp_rtc;
+              proxy_set_header Host $$host;
+              proxy_set_header Upgrade $$http_upgrade;
+              proxy_set_header Connection $$chirp_connection;
+              proxy_read_timeout 3600s;
+              proxy_send_timeout 3600s;
+          }
+          location ~ ^/(twirp|internal)(?:/|$) { return 404; }
+          location /authorization/v5/ {
+              access_log off;
+              limit_req zone=chirp_authorization burst=20 nodelay;
+              client_max_body_size 64k;
+              proxy_pass http://$$chirp_app;
+              proxy_read_timeout 15s;
+              proxy_send_timeout 15s;
+          }
+          location / {
+              proxy_pass http://$$chirp_app;
+              proxy_read_timeout 75s;
+              proxy_send_timeout 75s;
+          }
+      }
+
+volumes:
+  data:
+  logs:
+  media-keys:

@@ -1,0 +1,63 @@
+--- a/Sources/LiveKit/E2EE/KeyProvider.swift
++++ b/Sources/LiveKit/E2EE/KeyProvider.swift
+@@ -116,6 +116,7 @@
+         var currentKeyIndex: Int32 = 0
+         var chirpKeySlots: [String: Set<Int32>] = [:]
+         var chirpRetired = false
++        var chirpSlotGenerations: [Int32: UInt64] = [:]
+         var keyIndexGeneration: UInt64 = 0
+         var keyIndexObservers = [ObjectIdentifier: @Sendable (Int32, UInt64) -> Void]()
+     }
+@@ -178,6 +179,7 @@
+                 guard let participantId else { return false }
+                 rtcKeyProvider.setKey(keyData, with: targetIndex, forParticipant: participantId)
+                 state.chirpKeySlots[participantId, default: []].insert(targetIndex)
++                state.chirpSlotGenerations[targetIndex, default: 0] &+= 1
+             }
+             return true
+         }
+@@ -193,6 +195,7 @@
+             guard !state.chirpRetired, !options.sharedKey, index >= 0, index < options.keyRingSize,
+                   index != state.currentKeyIndex, !keys.isEmpty,
+                   Set(keys.keys) == Set(state.chirpKeySlots.keys), keys.values.allSatisfy({ $0.count == 32 }) else { return false }
++            state.chirpSlotGenerations[index, default: 0] &+= 1
+             for (identity, key) in keys {
+                 rtcKeyProvider.setKey(key, with: index, forParticipant: identity)
+                 state.chirpKeySlots[identity, default: []].insert(index)
+@@ -211,10 +214,10 @@
+         }
+     }
+ 
+-    func chirpRetireKeyIndex(_ index: Int32) -> Bool {
++    @nonobjc public func chirpRetireKeyIndex(_ index: Int32, generation: UInt64? = nil) -> Bool {
+         _state.mutate { state in
+             guard !state.chirpRetired, !options.sharedKey, index >= 0, index < options.keyRingSize,
+-                  index != state.currentKeyIndex else { return false }
++                  index != state.currentKeyIndex, generation.map({ $0 == state.chirpSlotGenerations[index] }) ?? true else { return false }
+             for identity in Array(state.chirpKeySlots.keys) where state.chirpKeySlots[identity]?.contains(index) == true {
+                 var tombstone = SymmetricKey(size: .bits256).withUnsafeBytes { Data($0) }
+                 rtcKeyProvider.setKey(tombstone, with: index, forParticipant: identity)
+@@ -225,9 +228,22 @@
+         }
+     }
+ 
++    /// Retire the previous receive slot independently of the app/UI executor.
++    /// A slot reused for a newer candidate has a different material generation.
++    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
++    @nonobjc public func chirpExpireKeyIndex(_ index: Int32, at deadline: ContinuousClock.Instant) {
++        guard let generation = _state.read({ $0.chirpSlotGenerations[index] }) else { return }
++        Task.detached { [self] in
++            while ContinuousClock.now < deadline {
++                try? await Task.sleep(for: .milliseconds(20))
++            }
++            _ = chirpRetireKeyIndex(index, generation: generation)
++        }
++    }
++
+     // Native cryptors may outlive their wrappers. Retire their material without
+     // disabling encryption, which could otherwise permit plaintext passthrough.
+-    func chirpRetireKeys() {
++    public func chirpRetireKeys() {
+         _state.mutate { state in
+             guard !state.chirpRetired, !options.sharedKey else { return }
+             state.chirpRetired = true
