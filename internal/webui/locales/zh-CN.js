@@ -68,6 +68,8 @@ export default {
   "common.backToLogin": "返回登录",
   "common.copy": "复制",
   "common.copied": "已复制",
+  "common.github": "GitHub",
+  "common.githubLabel": "在 GitHub 查看 Chirp 开源项目（新窗口打开）",
 
   "admin.meta": "Chirp 管理台：管理空间成员、审核加入申请、配置语音频道与查看运行状态。",
   "admin.title": "Chirp · 管理台",
@@ -175,6 +177,7 @@ export default {
 
   "admin.system.help": "查看服务运行状态、媒体连接与系统安全策略。",
   "admin.system.health": "健康检查接口",
+  "admin.system.github": "GitHub 仓库",
   "admin.system.privacyTitle": "密钥始终留在客户端",
   "admin.system.privacy": "管理台负责成员授权与房间协调，通话语音密钥仅保存在参与通话的客户端本地，服务端只负责协调分发与加密语音转发。",
   "admin.system.singleDevice": "每位成员同一时间仅允许一台设备登录客户端。新设备登录、被封禁、删除或被强制下线后，旧会话将立即失效，相关语音连接也会由服务端自动移出。",

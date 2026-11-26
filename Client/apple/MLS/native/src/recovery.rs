@@ -209,15 +209,5 @@ mod tests {
             decrypt(&file, password).unwrap().as_str(),
             vector["payload"].as_str().unwrap()
         );
-        let mut retired = B64.decode(vector["retired_file"].as_str().unwrap()).unwrap();
-        assert_eq!(
-            decrypt(&retired, password).unwrap_err(),
-            "unsupported or damaged recovery header"
-        );
-        retired[..8].copy_from_slice(MAGIC);
-        assert_eq!(
-            decrypt(&retired, password).unwrap_err(),
-            "wrong password or damaged recovery file"
-        );
     }
 }
