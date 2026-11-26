@@ -23,6 +23,10 @@ const icons = {
   x: '<path d="m6 6 12 12M6 18 18 6"/>',
   edit: '<path d="m16 3 5 5-12 12-6 1 1-6L16 3Zm-2 2 5 5"/>',
   trash: '<path d="M3 6h18M9 6V3h6v3m-10 0 1 15h12l1-15M10 10v7m4-7v7"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  eye: '<path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6Z"/><circle cx="12" cy="12" r="3"/>',
+  'eye-off': '<path d="m3 3 18 18M10.58 10.58a2 2 0 0 0 2.83 2.83M9.88 4.24A10.94 10.94 0 0 1 12 4c6.5 0 10 8 10 8a18.5 18.5 0 0 1-2.16 3.19m-3.42 2.25A9.77 9.77 0 0 1 12 18c-6.5 0-10-8-10-8a18.53 18.53 0 0 1 3.74-4.73"/>',
+  copy: '<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
 };
 const icon = (name) => `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">${icons[name] || icons.info}</svg>`;
 document.querySelectorAll('[data-icon]').forEach((element) => { element.innerHTML = icon(element.dataset.icon); });
@@ -108,14 +112,13 @@ function renderMembers() {
     const name = escapeHTML(member.display_name);
     const id = escapeHTML(member.id);
     const online = participants.has(member.id);
-    const accessKey = 'admin.identity.ban';
     return `<tr>
       <td data-label="${h('admin.columns.member')}"><div class="member-identity"><span class="member-avatar tone-${avatarTone(member.id)}" aria-hidden="true">${escapeHTML(Array.from(member.display_name)[0] || '?')}</span><div><span class="member-name">${name}</span><span class="member-id" title="${id}">${id}</span></div></div></td>
-      <td data-label="${h('admin.columns.access')}"><span class="pill ${member.enabled ? 'enabled' : 'disabled'}"><span class="tiny-dot"></span>${h(member.enabled ? 'common.enabled' : 'common.disabled')}</span></td>
+      <td data-label="${h('admin.columns.access')}"><span class="pill ${member.enabled ? 'enabled' : 'danger'}"><span class="tiny-dot"></span>${h(member.enabled ? 'common.enabled' : 'admin.identity.banned')}</span></td>
       <td data-label="${h('admin.columns.room')}"><span class="online-state ${online && statusKnown ? 'online' : 'offline'}"><span class="tiny-dot"></span>${online ? escapeHTML(participantRooms.get(member.id)) : h(statusKnown ? 'admin.members.notJoined' : 'admin.members.unknown')}</span></td>
       <td data-label="${h('admin.columns.created')}">${escapeHTML(formatDate(member.created_at))}</td>
       <td data-label="${h('admin.columns.login')}"><span>${h(member.login_active ? 'admin.members.signedIn' : 'admin.members.signedOut')}</span><span class="login-detail">${member.last_login_at ? h('admin.members.lastLogin', {time: formatDateTime(member.last_login_at)}) : h('admin.members.neverSignedIn')}</span>${member.login_active ? `<span class="login-detail">${h('admin.members.expires', {time: formatDateTime(member.credential_expires_at * 1000)})}</span>` : ''}</td>
-      <td data-label="${h('admin.columns.actions')}"><div class="row-actions"><button type="button" class="text-button" data-action="edit" data-id="${id}" aria-label="${h('admin.members.editLabel', {name: member.display_name})}">${h('common.edit')}</button>${member.enabled ? `<button type="button" class="text-button" data-action="toggle" data-id="${id}">${h(accessKey)}</button>` : `<span>${h('admin.identity.permanent')}</span>`}<button type="button" class="text-button" data-action="devices" data-id="${id}">${h('admin.identity.devices')}</button>${member.login_active ? `<button type="button" class="text-button" data-action="revoke" data-id="${id}" aria-label="${h('admin.members.revokeLabel', {name: member.display_name})}">${h('common.logout')}</button>` : ''}<span class="action-divider"></span><button type="button" class="icon-button" data-action="delete" data-id="${id}" aria-label="${h('admin.members.deleteLabel', {name: member.display_name})}" title="${h('admin.members.delete')}">${icon('trash')}</button></div></td>
+      <td data-label="${h('admin.columns.actions')}"><div class="row-actions"><button type="button" class="text-button" data-action="edit" data-id="${id}" aria-label="${h('admin.members.editLabel', {name: member.display_name})}">${h('common.edit')}</button><button type="button" class="text-button" data-action="devices" data-id="${id}">${h('admin.identity.devices')}</button>${member.login_active ? `<button type="button" class="text-button" data-action="revoke" data-id="${id}" aria-label="${h('admin.members.revokeLabel', {name: member.display_name})}">${h('admin.members.forceSignOut')}</button>` : ''}<span class="action-divider"></span>${member.enabled ? `<button type="button" class="text-button danger-text" data-action="toggle" data-id="${id}">${h('admin.identity.ban')}</button>` : ''}<button type="button" class="icon-button" data-action="delete" data-id="${id}" aria-label="${h('admin.members.deleteLabel', {name: member.display_name})}" title="${h('admin.members.delete')}">${icon('trash')}</button></div></td>
     </tr>`;
   }).join('') : `<tr><td colspan="6" class="empty-cell"><strong>${h(search ? 'admin.members.notFound' : 'admin.members.empty')}</strong><p>${h(search ? 'admin.members.searchHelp' : 'admin.members.emptyHelp')}</p></td></tr>`;
   $('#member-total').textContent = overview.members.length;
@@ -138,6 +141,34 @@ function formatDeviceTime(value) {
     ? formatDateTime(value * 1000) : t('admin.identity.noTimeRecord');
 }
 
+function renderRoomsList() {
+  if (!overview) return;
+  const rooms = overview.rooms || [];
+  $('#room-count').textContent = rooms.length;
+  $('#room-list').innerHTML = rooms.map((room) => {
+    const selected = room.room_id === selectedRoomID;
+    const available = room.media_status === 'available';
+    const onlineCount = (room.participants || []).length;
+    return `<button type="button" class="room-item" role="option" aria-selected="${selected}" data-select-room="${escapeHTML(room.room_id)}">
+      <div class="room-item-main">
+        <div class="room-item-title-row">
+          <span class="room-item-name">${escapeHTML(room.display_name)}</span>
+          ${room.password_required ? `<span class="room-item-lock" title="${h('admin.rooms.protected')}" aria-label="${h('admin.rooms.protected')}">${icon('lock')}</span>` : ''}
+        </div>
+        <div class="room-item-sub">
+          ${room.is_default ? `<span>${h('admin.rooms.defaultBadge')}</span>` : `<span>${h(room.password_required ? 'admin.rooms.protected' : 'admin.rooms.noPassword')}</span>`}
+        </div>
+      </div>
+      <span class="room-item-count ${available && onlineCount > 0 ? 'has-online' : ''}">${available ? h('admin.rooms.onlineBadge', {count: onlineCount}) : h('admin.rooms.offlineBadge')}</span>
+    </button>`;
+  }).join('');
+}
+
+function updateDescriptionCounter() {
+  const count = Array.from($('#room-description').value).length;
+  setText('#room-description-count', 'admin.rooms.charCount', {count});
+}
+
 function renderParticipants() {
   const available = currentRoom().media_status === 'available';
   const participants = currentRoom().participants || [];
@@ -155,11 +186,17 @@ function renderParticipants() {
 
 function renderRegistrationSettings() {
   const closed = overview?.registration_closed;
-  $('#registration-closed').setAttribute('aria-checked', String(closed === true));
+  const open = closed === false;
+  $('#registration-closed').setAttribute('aria-checked', String(open));
+  const pill = $('#registration-status-pill');
   if (typeof closed === 'boolean') {
     setText('#registration-status', closed ? 'admin.registrations.intakeClosed' : 'admin.registrations.intakeOpen');
+    setText(pill, closed ? 'admin.registrations.statusPaused' : 'admin.registrations.statusOpen');
+    pill.className = `pill ${closed ? 'warning' : 'enabled'}`;
   } else {
     setText('#registration-status', 'common.unavailable');
+    setText(pill, 'common.unavailable');
+    pill.className = 'pill neutral';
   }
 }
 
@@ -167,14 +204,15 @@ function renderRegistrations() {
   if (!overview) return;
   const registrations = overview.registrations || [];
   const search = $('#registration-search').value.trim().toLowerCase();
-  $('#registration-count').textContent = registrations.filter((item) => !item.member_id).length;
-  $('#metric-pending').textContent = registrations.filter((item) => !item.member_id).length;
+  const pendingCount = registrations.filter((item) => !item.member_id).length;
+  $('#registration-count').textContent = pendingCount;
+  $('#metric-pending').textContent = pendingCount;
   const filtered = registrations.filter((item) =>
     (registrationFilter === 'all' || Boolean(item.member_id) === (registrationFilter === 'approved')) &&
     `${item.nickname} ${item.request_id}`.toLowerCase().includes(search));
   setText('#registration-results', 'admin.registrations.results', {count: filtered.length});
   const full = overview.max_members > 0 && overview.members.filter((member) => member.enabled).length >= overview.max_members;
-  $('#registrations-list').innerHTML = filtered.length ? filtered.map((item) => `<article class="registration-item"><div class="registration-info"><div class="registration-heading"><strong>${escapeHTML(item.nickname)}</strong><span class="pill ${item.member_id ? 'enabled' : 'neutral'}">${h(item.member_id ? 'admin.registrations.approved' : 'admin.registrations.pending')}</span></div><code class="registration-id">${escapeHTML(item.request_id)}</code><p>${h('admin.registrations.createdAt', {date: formatDate(item.created_at)})}${item.member_id ? ` · ${h('admin.registrations.approvedAt', {date: formatDate(item.approved_at)})}` : ''}</p></div><div class="registration-actions">${item.member_id ? `<span class="field-help">${h('admin.registrations.manageMember')}</span>` : `<button class="button primary" type="button" data-registration-action="approve" data-id="${escapeHTML(item.request_id)}" ${full || busy ? 'disabled' : ''}>${h(full ? 'admin.registrations.full' : 'admin.registrations.approve')}</button><button class="button danger-outline" type="button" data-registration-action="delete" data-id="${escapeHTML(item.request_id)}" ${busy ? 'disabled' : ''}>${h('admin.registrations.delete')}</button>`}</div></article>`).join('') : `<p class="empty-description">${h(search ? 'admin.registrations.notFound' : 'admin.registrations.empty')}</p>`;
+  $('#registrations-list').innerHTML = filtered.length ? filtered.map((item) => `<article class="registration-item"><div class="registration-info"><div class="registration-heading"><strong>${escapeHTML(item.nickname)}</strong><span class="pill ${item.member_id ? 'enabled' : 'neutral'}">${h(item.member_id ? 'admin.registrations.approved' : 'admin.registrations.pending')}</span></div><div class="registration-id-row"><code class="registration-id">${escapeHTML(item.request_id)}</code><button type="button" class="copy-chip" data-copy-id="${escapeHTML(item.request_id)}" aria-label="${h('admin.registrations.copyId')}">${icon('copy')}<span>${h('common.copy')}</span></button></div><p>${h('admin.registrations.createdAt', {date: formatDate(item.created_at)})}${item.member_id ? ` · ${h('admin.registrations.approvedAt', {date: formatDate(item.approved_at)})}` : ''}</p></div><div class="registration-actions">${item.member_id ? `<span class="field-help">${h('admin.registrations.manageMember')}</span>` : `<button class="button primary" type="button" data-registration-action="approve" data-id="${escapeHTML(item.request_id)}" ${full || busy ? 'disabled' : ''}>${h(full ? 'admin.registrations.full' : 'admin.registrations.approve')}</button><button class="button danger-outline" type="button" data-registration-action="delete" data-id="${escapeHTML(item.request_id)}" ${busy ? 'disabled' : ''}>${h('admin.registrations.delete')}</button>`}</div></article>`).join('') : `<p class="empty-description">${h(search ? 'admin.registrations.notFound' : 'admin.registrations.empty')}</p>`;
 }
 
 function renderSystem(apiAvailable = true) {
@@ -197,24 +235,29 @@ function renderSystem(apiAvailable = true) {
 function render({ syncStatus = true } = {}) {
   const enabled = overview.members.filter((member) => member.enabled).length;
   const available = overview.media_status === 'available';
+  const room = currentRoom();
   $('#metrics').setAttribute('aria-busy', 'false');
   $('#metric-members').textContent = enabled;
-  setText('#metric-members-detail', 'admin.members.capacity');
+  setText('#metric-members-detail', 'admin.members.capacity', {total: overview.members.length});
   $('#metric-online').innerHTML = `${available ? overview.participants.length : '—'}<span>${h('admin.metrics.onlineUnit')}</span>`;
   setText('#metric-online-detail', available ? (overview.participants.length ? 'admin.metrics.talking' : 'admin.metrics.quiet') : 'admin.metrics.unknown');
   setText('#metric-service', available ? 'admin.metrics.available' : 'common.unavailable');
   $('#metric-service').classList.toggle('offline', !available);
+
   setText('#room-config-badge', 'admin.rooms.keyPolicyBadge');
-  setText('#room-password-state', currentRoom().password_required ? 'admin.rooms.protected' : 'admin.rooms.noPassword');
-  $('#room-password-state').className = `pill ${currentRoom().password_required ? 'enabled' : 'neutral'}`;
-  $('#room-config-badge').className = 'pill neutral';
-  $('#room-title').textContent = currentRoom().display_name;
-  $('#room-shortcut-title').textContent = currentRoom().display_name;
-  $('#room-select').innerHTML = overview.rooms.map((room) => `<option value="${escapeHTML(room.room_id)}">${escapeHTML(room.display_name)}${room.password_required ? h('admin.rooms.protectedSuffix') : ''}</option>`).join('');
-  $('#room-select').value = selectedRoomID;
-  $('#room-name').value = roomNameDrafts.get(selectedRoomID) ?? currentRoom().display_name;
-  $('#room-description').value = roomDescriptionDrafts.get(selectedRoomID) ?? currentRoom().description;
+  setText('#room-password-state', room.password_required ? 'admin.rooms.protected' : 'admin.rooms.noPassword');
+  $('#room-password-state').className = `pill ${room.password_required ? 'enabled' : 'neutral'}`;
+  $('#room-default-badge').hidden = !room.is_default;
+  $('#room-title').textContent = room.display_name;
+  $('#room-shortcut-title').textContent = room.display_name;
+  $('#room-name').value = roomNameDrafts.get(selectedRoomID) ?? room.display_name;
+  $('#room-description').value = roomDescriptionDrafts.get(selectedRoomID) ?? room.description ?? '';
+  updateDescriptionCounter();
+  setText('#room-delete-help', room.is_default ? 'admin.rooms.protectedNote' : 'admin.rooms.defaultHelp');
+  $('#delete-room-button').hidden = Boolean(room.is_default);
   setText('#room-shortcut-description', 'admin.rooms.summary', {rooms: overview.rooms.length});
+
+  renderRoomsList();
   renderSystem();
   renderClientVersions();
   renderMembers();
@@ -230,16 +273,29 @@ function render({ syncStatus = true } = {}) {
 }
 
 function renderClientVersions() {
+  const platforms = ['ios', 'macos', 'windows', 'android'];
+  $('#version-platform-cards').innerHTML = platforms.map((platform) => {
+    const policy = clientPolicies.find((item) => item.platform === platform);
+    const hasDraft = versionDrafts.has(platform);
+    const selected = platform === selectedPlatform;
+    return `<button type="button" class="platform-card" role="tab" aria-selected="${selected}" data-platform="${platform}">
+      <div class="platform-card-top">
+        <strong>${escapeHTML(clientPlatformNames.get(platform))}</strong>
+        ${hasDraft ? `<span class="pill warning">${h('admin.versions.draftBadge')}</span>` : ''}
+      </div>
+      <span class="platform-card-summary">${policy ? h('admin.versions.summary', {version: policy.latest_version, build: policy.latest_build, minimumVersion: policy.minimum_version, minimum: policy.minimum_build}) : h('common.loadingEllipsis')}</span>
+    </button>`;
+  }).join('');
+
+  setText('#version-editor-heading', 'admin.versions.editing', {platform: clientPlatformNames.get(selectedPlatform) || selectedPlatform});
   const policy = clientPolicies.find((item) => item.platform === selectedPlatform);
   const value = versionDrafts.get(selectedPlatform) || policy;
-  $('#version-platform').value = selectedPlatform;
   if (value) {
     $('#version-number').value = value.latest_version;
     $('#version-build').value = value.latest_build;
     $('#version-minimum-number').value = value.minimum_version;
     $('#version-minimum').value = value.minimum_build;
   }
-  $('#version-policies').innerHTML = clientPolicies.map((item) => `<div><dt>${clientPlatformNames.get(item.platform)}</dt><dd>${h('admin.versions.summary', {version: item.latest_version, build: item.latest_build, minimumVersion: item.minimum_version, minimum: item.minimum_build})}</dd></div>`).join('');
 }
 
 function updateButtons() {
@@ -249,23 +305,24 @@ function updateButtons() {
   const registrationSwitch = $('#registration-closed');
   registrationSwitch.disabled = typeof overview?.registration_closed !== 'boolean';
   registrationSwitch.setAttribute('aria-disabled', String(busy || registrationSwitch.disabled));
-  $('#room-name').disabled = busy;
+  $('#open-create-room').disabled = busy || !ready;
+  $('#room-name').disabled = busy || !ready;
   $('#room-description').disabled = busy || !ready;
   const versionsReady = ready && clientPolicies.length > 0;
-  for (const id of ['version-platform', 'version-number', 'version-build', 'version-minimum-number', 'version-minimum']) $(`#${id}`).disabled = busy || !versionsReady;
+  for (const id of ['version-number', 'version-build', 'version-minimum-number', 'version-minimum']) $(`#${id}`).disabled = busy || !versionsReady;
   $('#version-submit').disabled = busy || !versionsReady || !versionDrafts.has(selectedPlatform);
   $('#room-password').disabled = busy || !ready;
+  $('#toggle-room-password').disabled = busy || !ready;
   $('#room-password-submit').disabled = busy || !ready || !$('#room-password').value;
   $('#room-password-clear').disabled = busy || !ready || !currentRoom().password_required;
   if (!busy && ready) setText('#room-password-submit', currentRoom().password_required ? 'admin.rooms.changePassword' : 'admin.rooms.setPassword');
-  $('#room-select').disabled = busy || !ready;
   $('#room-submit').disabled = busy || !ready || !roomNameDrafts.has(selectedRoomID);
   $('#room-description-submit').disabled = busy || !ready || !roomDescriptionDrafts.has(selectedRoomID);
   $('#end-room-button').disabled = busy || !ready;
   $('#delete-room-button').disabled = busy || !ready || currentRoom().is_default;
   $('#new-room-name').disabled = busy || !ready;
   $('#create-room-submit').disabled = busy || !ready || !$('#new-room-name').value.trim();
-  document.querySelectorAll('#members-body button, #participants-list button').forEach((button) => { button.disabled = busy; });
+  document.querySelectorAll('#members-body button, #participants-list button, #room-list button, #version-platform-cards button').forEach((button) => { button.disabled = busy; });
   document.querySelectorAll('[data-registration-action]').forEach((button) => { button.disabled = busy || (button.dataset.registrationAction === 'approve' && overview.max_members > 0 && overview.members.filter((member) => member.enabled).length >= overview.max_members); });
 }
 
@@ -312,6 +369,7 @@ function renderRefreshFailure(error) {
     overview.media_status = 'unavailable';
     overview.participants = null;
     overview.rooms.forEach((room) => { room.media_status = 'unavailable'; room.participants = null; });
+    renderRoomsList();
     renderMembers();
     renderParticipants();
     renderRegistrations();
@@ -342,6 +400,9 @@ function navigate(event) {
     if (link.dataset.view === view) link.setAttribute('aria-current', 'page');
     else link.removeAttribute('aria-current');
   });
+  document.querySelectorAll('[data-metric-view]').forEach((card) => {
+    card.classList.toggle('active-metric', card.dataset.metricView === view);
+  });
   setText('#page-title', viewInfo[view][0]);
   setText('#page-description', viewInfo[view][1]);
   setText('#breadcrumb-current', viewInfo[view][0]);
@@ -356,9 +417,6 @@ function openMember(member) {
   editingMember = member;
   $('#member-form').reset();
   $('#member-name').value = member.display_name;
-  $('#member-enabled').checked = member.enabled;
-  $('#member-enabled').disabled = !member.enabled;
-  $('#member-enabled-field').hidden = !member.enabled;
   message('#member-form-error');
   $('#member-dialog').showModal();
   $('#member-name').focus();
@@ -400,14 +458,19 @@ async function mutate(action, { errorTarget, button } = {}) {
   }
 }
 
-$('#version-platform').addEventListener('change', () => {
-  const platform = $('#version-platform').value;
-  if (!clientPlatformNames.has(platform)) return;
+$('#version-platform-cards').addEventListener('click', (event) => {
+  const card = event.target.closest('[data-platform]');
+  if (!card || busy) return;
+  const platform = card.dataset.platform;
+  if (!clientPlatformNames.has(platform) || platform === selectedPlatform) return;
   selectedPlatform = platform;
-  message('#version-form-error'); renderClientVersions(); updateButtons();
+  message('#version-form-error');
+  renderClientVersions();
+  updateButtons();
 });
 for (const id of ['version-number', 'version-build', 'version-minimum-number', 'version-minimum']) $(`#${id}`).addEventListener('input', () => {
   versionDrafts.set(selectedPlatform, {latest_version: $('#version-number').value, latest_build: $('#version-build').value, minimum_version: $('#version-minimum-number').value, minimum_build: $('#version-minimum').value});
+  renderClientVersions();
   updateButtons();
 });
 $('#version-form').addEventListener('submit', (event) => {
@@ -432,9 +495,8 @@ $('#member-form').addEventListener('submit', (event) => {
   if (!member) return;
   const displayName = $('#member-name').value.trim();
   if (!displayName) { message('#member-form-error', 'admin.members.enterName'); return; }
-  const enabled = $('#member-enabled').checked;
   mutate(async () => {
-    await api(`/members/${encodeURIComponent(member.id)}`, 'PUT', { display_name: displayName, enabled });
+    await api(`/members/${encodeURIComponent(member.id)}`, 'PUT', { display_name: displayName, enabled: member.enabled });
     $('#member-dialog').close();
     toast('admin.members.saved');
     await refresh({ quiet: true });
@@ -464,17 +526,14 @@ $('#members-body').addEventListener('click', (event) => {
     } });
   } else if (button.dataset.action === 'toggle') {
     if (!member.enabled) return;
-    {
-      confirm({ title: {key: 'admin.confirm.disableMember', params: {name: member.display_name}}, description: 'admin.confirm.disableMemberHelp', label: 'admin.confirm.disable', action: async () => {
-        await api(`/members/${encodeURIComponent(member.id)}`, 'PUT', { display_name: member.display_name, enabled: false });
-        $('#confirm-dialog').close();
-        toast('admin.members.disabled');
-        await refresh({ quiet: true });
-      } });
-    }
+    confirm({ title: {key: 'admin.confirm.disableMember', params: {name: member.display_name}}, description: 'admin.confirm.disableMemberHelp', label: 'admin.confirm.disable', action: async () => {
+      await api(`/members/${encodeURIComponent(member.id)}`, 'PUT', { display_name: member.display_name, enabled: false });
+      $('#confirm-dialog').close();
+      toast('admin.members.disabled');
+      await refresh({ quiet: true });
+    } });
   }
 });
-
 
 $('#participants-list').addEventListener('click', (event) => {
   const button = event.target.closest('[data-remove]');
@@ -500,6 +559,14 @@ $('#end-room-button').addEventListener('click', () => {
     await refresh({ quiet: true });
   } });
 });
+$('#open-create-room').addEventListener('click', () => {
+  if (busy || !overview) return;
+  $('#create-room-form').reset();
+  message('#create-room-error');
+  updateButtons();
+  $('#create-room-dialog').showModal();
+  $('#new-room-name').focus();
+});
 $('#new-room-name').addEventListener('input', updateButtons);
 $('#create-room-form').addEventListener('submit', (event) => {
   event.preventDefault();
@@ -509,6 +576,7 @@ $('#create-room-form').addEventListener('submit', (event) => {
     const room = await api('/rooms', 'POST', {display_name: name});
     selectedRoomID = room.room_id;
     $('#new-room-name').value = '';
+    $('#create-room-dialog').close();
     toast('admin.rooms.created');
     await refresh({quiet: true});
   }, {errorTarget: '#create-room-error', button: $('#create-room-submit')});
@@ -525,14 +593,29 @@ $('#delete-room-button').addEventListener('click', () => {
 });
 $('#confirm-button').addEventListener('click', () => { if (confirmAction) mutate(confirmAction, { errorTarget: '#confirm-error', button: $('#confirm-button') }); });
 
-$('#room-name').addEventListener('input', () => { roomNameDrafts.set(selectedRoomID, $('#room-name').value); updateButtons(); });
-$('#room-select').addEventListener('change', () => {
-  selectedRoomID = $('#room-select').value;
-  $('#room-password').value = '';
+$('#room-list').addEventListener('click', (event) => {
+  const button = event.target.closest('[data-select-room]');
+  if (!button || busy) return;
+  const nextRoomID = button.dataset.selectRoom;
+  if (nextRoomID === selectedRoomID) return;
+  selectedRoomID = nextRoomID;
+  const passwordInput = $('#room-password');
+  passwordInput.value = '';
+  passwordInput.type = 'password';
+  $('#toggle-room-password').setAttribute('aria-pressed', 'false');
+  $('#toggle-room-password').setAttribute('aria-label', t('admin.rooms.showPassword'));
+  $('#toggle-room-password').innerHTML = icon('eye');
   message('#room-password-error');
   message('#room-form-error');
   message('#room-description-error');
   render();
+});
+
+$('#room-name').addEventListener('input', () => {
+  const value = $('#room-name').value;
+  if (value === currentRoom().display_name) roomNameDrafts.delete(selectedRoomID);
+  else roomNameDrafts.set(selectedRoomID, value);
+  updateButtons();
 });
 $('#room-form').addEventListener('submit', (event) => {
   event.preventDefault();
@@ -552,8 +635,9 @@ $('#room-form').addEventListener('submit', (event) => {
 
 $('#room-description').addEventListener('input', (event) => {
   const value = event.target.value;
-  if (value === currentRoom().description) roomDescriptionDrafts.delete(selectedRoomID);
+  if (value === (currentRoom().description ?? '')) roomDescriptionDrafts.delete(selectedRoomID);
   else roomDescriptionDrafts.set(selectedRoomID, value);
+  updateDescriptionCounter();
   updateButtons();
 });
 $('#room-description-form').addEventListener('submit', (event) => {
@@ -574,6 +658,15 @@ $('#room-description-form').addEventListener('submit', (event) => {
   }, { errorTarget: '#room-description-error', button: $('#room-description-submit') });
 });
 
+$('#toggle-room-password').addEventListener('click', () => {
+  const input = $('#room-password');
+  const toggle = $('#toggle-room-password');
+  const show = input.type === 'password';
+  input.type = show ? 'text' : 'password';
+  toggle.setAttribute('aria-pressed', String(show));
+  toggle.setAttribute('aria-label', t(show ? 'admin.rooms.hidePassword' : 'admin.rooms.showPassword'));
+  toggle.innerHTML = icon(show ? 'eye-off' : 'eye');
+});
 $('#room-password').addEventListener('input', updateButtons);
 $('#room-password-form').addEventListener('submit', (event) => {
   event.preventDefault();
@@ -643,7 +736,17 @@ document.querySelectorAll('[data-registration-filter]').forEach((button) => butt
   document.querySelectorAll('[data-registration-filter]').forEach((item) => item.setAttribute('aria-pressed', String(item === button)));
   renderRegistrations();
 }));
-$('#registrations-list').addEventListener('click', (event) => {
+$('#registrations-list').addEventListener('click', async (event) => {
+  const copyButton = event.target.closest('[data-copy-id]');
+  if (copyButton) {
+    try {
+      await navigator.clipboard.writeText(copyButton.dataset.copyId);
+      const label = copyButton.querySelector('span');
+      if (label) label.textContent = t('common.copied');
+      setTimeout(() => { if (label?.isConnected) label.textContent = t('common.copy'); }, 1500);
+    } catch { toast('errors.operation'); }
+    return;
+  }
   const button = event.target.closest('[data-registration-action]');
   if (!button || busy) return;
   const item = (overview?.registrations || []).find((request) => request.request_id === button.dataset.id);
@@ -683,23 +786,41 @@ async function deviceFingerprint(key) {
 }
 async function openDevices(member) {
   const devices = await api(`/members/${encodeURIComponent(member.id)}/devices`);
-  const rows = await Promise.all(devices.map(async (d) => `<article class="registration-item"><div class="registration-info"><strong>${escapeHTML(d.name)}</strong><p>${escapeHTML(d.platform)}</p><code>${await deviceFingerprint(d.device_key)}</code><p>${h(d.revoked ? 'admin.identity.permanent' : 'admin.identity.active')}</p><p>${h('admin.identity.lastOnline', {time: formatDeviceTime(d.last_login_at)})}</p><p>${h('admin.identity.firstRegistered', {time: formatDeviceTime(d.created_at)})}</p></div>${d.revoked ? '' : `<button type="button" class="button danger-outline" data-revoke-device="${escapeHTML(d.device_key)}" data-member="${escapeHTML(member.id)}">${h('admin.identity.revoke')}</button>`}</article>`));
-  setText('#identity-dialog-title', 'admin.identity.devices');
-  $('#identity-dialog-content').innerHTML = `<p>${h('admin.identity.deviceHelp')}</p><p>${h('admin.identity.timeHelp')}</p>${rows.join('') || `<p>${h('admin.identity.noDevices')}</p>`}`;
+  const rows = await Promise.all(devices.map(async (d) => `<article class="identity-card">
+    <div class="identity-card-info">
+      <div class="identity-card-header">
+        <strong>${escapeHTML(d.name)}</strong>
+        <span class="pill ${d.revoked ? 'danger' : 'enabled'}">${h(d.revoked ? 'admin.identity.permanent' : 'admin.identity.active')}</span>
+        <span class="pill neutral">${escapeHTML(d.platform)}</span>
+      </div>
+      <div class="identity-code-row"><span>${h('admin.identity.deviceFingerprint')}</span><code>${await deviceFingerprint(d.device_key)}</code></div>
+      <div class="identity-meta">
+        <span>${h('admin.identity.lastOnline', {time: formatDeviceTime(d.last_login_at)})}</span>
+        <span>${h('admin.identity.firstRegistered', {time: formatDeviceTime(d.created_at)})}</span>
+      </div>
+    </div>
+    ${d.revoked ? '' : `<button type="button" class="button danger-outline" data-revoke-device="${escapeHTML(d.device_key)}" data-member="${escapeHTML(member.id)}">${h('admin.identity.revoke')}</button>`}
+  </article>`));
+  setText('#identity-dialog-title', 'admin.identity.devicesFor', {name: member.display_name});
+  $('#identity-dialog-content').innerHTML = `<p class="identity-intro">${h('admin.identity.deviceHelp')}</p><p class="identity-intro">${h('admin.identity.timeHelp')}</p><div class="identity-list">${rows.join('') || `<p class="empty-description">${h('admin.identity.noDevices')}</p>`}</div>`;
   $('#identity-dialog').showModal();
 }
 $('#show-blacklist').addEventListener('click', async () => {
   try {
     const records = await api('/blacklist');
     setText('#identity-dialog-title', 'admin.identity.blacklist');
-    $('#identity-dialog-content').innerHTML = `<p>${h('admin.identity.permanentHelp')}</p>` + records.map((r) => `<article class="registration-item"><div><strong>${escapeHTML(r.username)}</strong><p>${escapeHTML(r.kind)} · ${escapeHTML(r.account_id)}</p><code>${escapeHTML(r.subject)}</code><p>${escapeHTML(formatDateTime(r.created_at * 1000))}</p></div></article>`).join('');
+    const items = records.map((r) => {
+      const kindKey = r.kind === 'account' ? 'admin.identity.blacklistAccount' : 'admin.identity.blacklistDevice';
+      return `<article class="identity-card"><div class="identity-card-info"><div class="identity-card-header"><strong>${escapeHTML(r.username)}</strong><span class="pill danger">${h(kindKey)}</span></div><div class="identity-meta"><span>${h('admin.identity.blacklistAccountLabel')}：<code>${escapeHTML(r.account_id)}</code></span><span>${escapeHTML(formatDateTime(r.created_at * 1000))}</span></div><div class="identity-code-row"><span>${h('admin.identity.blacklistSubjectLabel')}</span><code>${escapeHTML(r.subject)}</code></div></div></article>`;
+    }).join('');
+    $('#identity-dialog-content').innerHTML = `<p class="identity-intro">${h('admin.identity.permanentHelp')}</p><div class="identity-list">${items || `<p class="empty-description">${h('admin.identity.blacklistEmpty')}</p>`}</div>`;
     $('#identity-dialog').showModal();
   } catch (error) { message('#global-error', error); }
 });
 $('#identity-dialog-content').addEventListener('click', (event) => {
   const button = event.target.closest('[data-revoke-device]'); if (!button || busy) return;
   $('#identity-dialog').close();
-  confirm({title: 'admin.identity.revoke', description: 'admin.identity.deviceHelp', label: 'admin.identity.revoke', action: async () => {
+  confirm({title: 'admin.identity.revokeDeviceConfirm', description: 'admin.identity.deviceHelp', label: 'admin.identity.revoke', action: async () => {
     await api(`/members/${encodeURIComponent(button.dataset.member)}/devices/${encodeURIComponent(button.dataset.revokeDevice)}`, 'DELETE');
     $('#confirm-dialog').close(); await refresh({quiet: true});
   }});
