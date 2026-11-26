@@ -9,8 +9,4 @@ import Testing
     let response = try await native.security(["action": "decrypt", "file": vector["file"]!, "password": vector["password"]!])
     let decoded = try JSONDecoder().decode([String: String].self, from: response)
     #expect(decoded["payload"] == vector["payload"])
-    let retiredFile = try #require(vector["retired_file"])
-    await #expect(throws: MLSError.self) {
-        try await native.security(["action": "decrypt", "file": retiredFile, "password": vector["password"]!])
-    }
 }

@@ -68,6 +68,8 @@ export default {
   "common.backToLogin": "Back to sign in",
   "common.copy": "Copy",
   "common.copied": "Copied",
+  "common.github": "GitHub",
+  "common.githubLabel": "View Chirp on GitHub (opens in a new tab)",
 
   "admin.meta": "Manage space members, review applications, configure voice rooms, and monitor service status in Chirp.",
   "admin.title": "Chirp · Admin console",
@@ -175,6 +177,7 @@ export default {
 
   "admin.system.help": "Check service health, media connectivity, and security policies.",
   "admin.system.health": "Health endpoint",
+  "admin.system.github": "GitHub repository",
   "admin.system.privacyTitle": "Keys stay in your apps",
   "admin.system.privacy": "The console manages member access and room coordination. Voice encryption keys remain on participants’ devices while the server relays encrypted audio.",
   "admin.system.singleDevice": "Each member can sign in on one device at a time. Signing in elsewhere, banning, deleting, or forcing sign-out invalidates the old session and removes its voice connections.",
