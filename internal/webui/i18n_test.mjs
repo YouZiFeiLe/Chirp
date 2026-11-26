@@ -73,7 +73,7 @@ test('dynamic messages and saved button labels can be translated without resetti
   initI18n(windowFor(['zh-CN']));
   setText(element, 'admin.confirm.deleteMember', { name: '<Alice & Bob>' });
   const original = textBinding(element);
-  assert.equal(element.textContent, '删除 <Alice & Bob>？');
+  assert.equal(element.textContent, '删除成员 <Alice & Bob>？');
   setText(element, 'common.processing');
   setLanguage('en');
   assert.equal(element.textContent, 'Working…');
@@ -81,7 +81,7 @@ test('dynamic messages and saved button labels can be translated without resetti
   assert.equal(element.textContent, 'Delete <Alice & Bob>?');
   setText(element, 'admin.errors.stale', { message: new LocalizedError('errors.timeout') });
   setLanguage('zh-CN');
-  assert.equal(element.textContent, '请求超时，请稍后重试 当前显示上次同步的数据。');
+  assert.equal(element.textContent, '请求超时，请检查网络后重试。 当前展示的是上次同步的数据。');
   element.isConnected = false;
 });
 

@@ -137,7 +137,7 @@ sudo docker compose up -d --wait --wait-timeout 600
 | [`Client/android/`](Client/android/) | Android Kotlin / Jetpack Compose / C++ JNI 客户端工程与开源发布签名配置 |
 | [`Client/windows/`](Client/windows/) | Windows C# WinUI 3 桌面壳、Go 协议子进程与 Rust Sonora 音频处理模块 |
 | [`deploy/`](deploy/) & [`compose.yaml`](compose.yaml) | 公开生产成品镜像 Compose、Nginx 反代模板与 `FROM scratch` 容器构建文件 |
-| [`scripts/`](scripts/) | 依赖准备、自动化回归测试、端到端联调及开源构建发布流水线脚本 |
+| [`scripts/`](scripts/) | 依赖准备、自动化回归测试与端到端联调脚本 |
 
 </details>
 
