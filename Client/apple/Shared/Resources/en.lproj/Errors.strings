@@ -1,4 +1,4 @@
-// Stable client/server error codes. See Client/apple/ERROR_CODES.md.
+// Keys match the raw values of ClientErrorCode in Shared/ClientError.swift.
 "NETWORK_TIME_REQUIRED" = "Verify your system time before signing in or approving a device.";
 "CLIENT_UNEXPECTED" = "Something went wrong. Please try again.";
 "CLIENT_UNKNOWN_SERVER_ERROR" = "The server returned an unrecognized error. Please try again.";

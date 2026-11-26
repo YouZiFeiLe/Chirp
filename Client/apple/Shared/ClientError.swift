@@ -1,7 +1,7 @@
 import Foundation
 import ChirpMLS
 
-// Keep raw values stable. See ERROR_CODES.md for meanings and extension rules.
+// Keep raw values stable and add new codes to both language versions of Errors.strings.
 enum ClientErrorCode: String, Codable, CaseIterable, Sendable {
     case registrationPending = "REGISTRATION_PENDING"
     case registrationRejected = "REGISTRATION_REJECTED"

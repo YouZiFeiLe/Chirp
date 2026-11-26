@@ -1,4 +1,4 @@
-// Stable client/server error codes. See Client/apple/ERROR_CODES.md.
+// Keys match the raw values of ClientErrorCode in Shared/ClientError.swift.
 "NETWORK_TIME_REQUIRED" = "请先通过系统时间校验，再登录或授权设备。";
 "CLIENT_UNEXPECTED" = "操作未完成，请稍后重试";
 "CLIENT_UNKNOWN_SERVER_ERROR" = "服务器返回了未识别的错误，请稍后重试";

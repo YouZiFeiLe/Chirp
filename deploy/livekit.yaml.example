@@ -50,7 +50,7 @@ turn:
   enabled: false
 
 # Compose 用 LIVEKIT_API_KEY 和 LIVEKIT_API_SECRET 生成 LIVEKIT_KEYS，app 使用同一对凭据。
-# 公开 Compose 在 media-keys 卷中生成媒体凭据。运维说明见 docs/server-operations.md。
+# 公开 Compose 在 media-keys 卷中生成媒体凭据。运维说明请查阅知识库网站的《服务端配置与运维》。
 
 # 上游 LiveKit 仍可能在入房响应中下发默认公共 STUN 列表，单靠此 YAML 无法阻止。
 # 项目的 Apple、Android SDK 补丁和 Windows Go SDK 构建脚本都会清空外部 ICE 服务器列表。

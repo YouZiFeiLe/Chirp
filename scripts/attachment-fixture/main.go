@@ -100,7 +100,7 @@ func productionClient(login store.ClientLogin, device testidentity.Client, open,
 	}
 }
 
-// Only the exact public example documented in docs/authorization-keys.md may
+// Only the exact public example shipped in deploy/authorization-key.default may
 // stand in for the real authority when exercising the shipped Activity trust.
 func publicDemoKey() ed25519.PrivateKey {
 	const path = "deploy/authorization-key.default"

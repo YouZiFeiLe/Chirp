@@ -42,7 +42,7 @@ services:
         target: /authorization
         bind:
           create_host_path: false
-    # 同机原生 Nginx 使用回环上游。异机或容器反代的接入方式见 docs/server-operations.md。
+    # 同机原生 Nginx 使用回环上游。异机或容器反代请查阅知识库网站的《接入已有 Nginx》。
     ports:
       - "${CHIRP_HTTP_PUBLISH_IP:-127.0.0.1}:18115:18115/tcp"
     restart: unless-stopped

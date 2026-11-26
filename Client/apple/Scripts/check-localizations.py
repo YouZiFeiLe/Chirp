@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate shared Apple resources, error documentation and UI string coverage."""
+"""Validate shared Apple resources, error code translations and UI string coverage."""
 from collections import Counter
 import json
 from pathlib import Path
@@ -67,9 +67,6 @@ for table in ("Localizable", "Errors", "InfoPlist"):
 codes = set(re.findall(r'^    case \w+ = "([A-Z0-9_]+)"', (SHARED / "ClientError.swift").read_text(), re.MULTILINE))
 if codes != tables["Errors"].keys():
     FAILURES.append(f"Error code/resource mismatch: {codes ^ tables['Errors'].keys()}")
-documented = set(re.findall(r'^\| `([A-Z0-9_]+)` \|', (APPLE / "ERROR_CODES.md").read_text(), re.MULTILINE))
-if codes != documented:
-    FAILURES.append(f"Error code/documentation mismatch: {codes ^ documented}")
 
 for source in sorted(SHARED.rglob("*.swift")):
     for number, line in enumerate(source.read_text().splitlines(), 1):
@@ -93,4 +90,4 @@ for source in sorted(SHARED.rglob("*.swift")):
 
 if FAILURES:
     raise SystemExit("\n".join(FAILURES))
-print(f"Localization checks passed: {len(tables['Localizable'])} UI keys, {len(codes)} documented error codes, 2 languages.")
+print(f"Localization checks passed: {len(tables['Localizable'])} UI keys, {len(codes)} localized error codes, 2 languages.")

@@ -5,7 +5,7 @@ import AppKit
 import UIKit
 #endif
 
-/// Shared semantic tokens. Platform-neutral values and usage live in design-system/chirp-together.
+/// Platform-neutral values live in design-system/chirp-together/design-tokens.json.
 enum ChirpTheme {
     static let canvas = adaptive(0xF4F6F2, 0x101B17)
     static let surface = adaptive(0xFFFFFF, 0x192A23)
