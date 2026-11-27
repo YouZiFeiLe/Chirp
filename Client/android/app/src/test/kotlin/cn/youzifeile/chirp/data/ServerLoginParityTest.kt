@@ -13,6 +13,7 @@ import okhttp3.Response
 import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.*
 import org.junit.Test
+import okio.Buffer
 
 class ServerLoginParityTest {
     private val discovery = "https://discovery.example/chirp"
@@ -78,6 +79,98 @@ class ServerLoginParityTest {
     private fun MockWebServer.enqueueDiscovery() {
         enqueue(MockResponse(body = body.toString()))
         enqueue(MockResponse(body = healthy))
+    }
+
+    @Test fun resumptionPinsTheServiceAccountDeviceAndOriginalExpiry() = runTest {
+        val server = repository(body)
+        val connection = server.discover(discovery)
+        val seed = randomBytes(32)
+        val local = LocalDevice(base64(seed), DeviceIdentity.issue(randomBytes(32), publicKey(seed)))
+        val account = "member_" + "a".repeat(16)
+        val login = Login("chirp_" + "a".repeat(43), account + ".login_" + "b".repeat(16), "Test", nowSeconds() + 300, local.device)
+        val token = "resume-v1_" + base64url(randomBytes(32))
+        assertNull(SavedLogin.fromActivation(buildJsonObject {}, login, connection))
+        assertNull(SavedLogin.fromActivation(buildJsonObject { put("resume_token", login.credential) }, login, connection))
+        val saved = requireNotNull(SavedLogin.fromActivation(buildJsonObject { put("resume_token", token) }, login, connection))
+        assertFalse(wireJson.encodeToString(saved).contains(login.credential))
+        val challenge = base64url(randomBytes(32))
+        val rotated = "chirp_" + "c".repeat(43)
+        val valid = buildJsonObject {
+            put("credential", rotated); put("expires_at", login.expiresAt); put("participant_identity", login.identity)
+            putJsonObject("member") { put("id", account); put("enabled", true); put("display_name", "Renamed") }
+            put("device_identity", local.device.toWire())
+        }
+        val beyondCertificate = JsonObject(valid + ("expires_at" to JsonPrimitive(local.device.deadline + 1)))
+        assertEquals("CLIENT_INVALID_LOGIN_SESSION",
+            assertThrows(ChirpException::class.java) { Login.fromResponse(beyondCertificate, account, local.device) }.code)
+        var reply = valid
+        var proofExpired = true
+        val actions = mutableListOf<String>()
+        val http = ChirpHttp(OkHttpClient.Builder().addInterceptor { chain ->
+            val request = chain.request()
+            assertEquals(auth, request.url.toString().substringBefore("/api/client/resume/"))
+            assertEquals("android", request.header("X-Chirp-Platform"))
+            assertEquals(BuildConfig.VERSION_NAME, request.header("X-Chirp-Version"))
+            assertEquals(BuildConfig.CLIENT_BUILD.toString(), request.header("X-Chirp-Build"))
+            assertEquals("no-store", request.header("Cache-Control"))
+            assertTrue(request.body!!.isOneShot())
+            assertNull(request.header("Authorization"))
+            val json = parseObject(Buffer().also { request.body!!.writeTo(it) }.readByteArray())
+            assertEquals(token, json.text("resume_token"))
+            val action = request.url.pathSegments.last()
+            actions += action
+            var status = 200
+            val payload = when (action) {
+                "challenge" -> buildJsonObject { put("challenge", challenge) }
+                "complete" -> {
+                    verifySignature(local.device.leaf, json.text("signature"), saved.proofMessage(challenge))
+                    if (proofExpired) {
+                        status = 409
+                        buildJsonObject { putJsonObject("error") { put("code", "RESUMPTION_PROOF_INVALID") } }
+                    } else reply
+                }
+                else -> error("Unexpected resumption request")
+            }
+            Response.Builder().request(request).protocol(Protocol.HTTP_1_1).message("Test")
+                .code(status).body(payload.toString().toResponseBody()).build()
+        })
+        val lookup: suspend (String, String) -> LocalDevice = { origin, id ->
+            assertEquals(connection.passkeyOrigin.identityOrigin, origin); assertEquals(account, id); local
+        }
+        suspend fun restore() = saved.restore(server, http, lookup) {}.first.login
+        val expiredProof = runCatching { restore() }.exceptionOrNull() as ChirpException
+        assertEquals("RESUMPTION_PROOF_INVALID", expiredProof.code)
+        assertFalse(expiredProof.clientFailure().endsSavedLogin())
+        proofExpired = false
+        assertEquals(login.copy(credential = rotated, name = "Renamed"), restore())
+        assertEquals(listOf("challenge", "complete", "challenge", "complete"), actions)
+        val wrongDevice = local.device.copy(certificates = local.device.certificates.map { it.copy(canEnroll = false) })
+        for (change in listOf(
+            "expires_at" to JsonPrimitive(login.expiresAt + 1),
+            "participant_identity" to JsonPrimitive(account + ".login_" + "c".repeat(16)),
+            "member" to buildJsonObject { put("id", "member_" + "d".repeat(16)); put("enabled", true); put("display_name", "Test") },
+            "device_identity" to wrongDevice.toWire(),
+        )) {
+            reply = JsonObject(valid + change)
+            assertEquals("CLIENT_INVALID_LOGIN_SESSION", (runCatching { restore() }.exceptionOrNull() as ChirpException).code)
+        }
+        actions.clear()
+        val changedEndpoints = JsonObject(body.obj("endpoints") + ("api_base_url" to JsonPrimitive("/other/")))
+        val changed = repository(JsonObject(body + ("endpoints" to changedEndpoints)))
+        val failure = runCatching { saved.restore(changed, http, lookup) {} }.exceptionOrNull() as ChirpException
+        assertEquals("SERVER_CONFIGURATION_CHANGED", failure.code)
+        assertTrue(actions.isEmpty())
+    }
+
+    @Test fun permanentDenialsRemoveSavedLoginWhileARetryCanUseTheOriginalRecord() {
+        for (code in listOf("INVALID_AUTHORIZATION", "MEMBER_DISABLED", "IDENTITY_BLACKLISTED", "CLIENT_UPDATE_REQUIRED",
+            "LOGIN_BIOMETRICS_CHANGED", "DEVICE_IDENTITY_REQUIRED", "SESSION_EXPIRED")) {
+            assertTrue(code, ClientFailure(code).endsSavedLogin())
+        }
+        for (code in listOf("CLIENT_NETWORK_FAILURE", "SERVER_UNAVAILABLE", "NETWORK_TIME_REQUIRED",
+            "RESUMPTION_PROOF_INVALID", "CLIENT_LOCAL_UNLOCK_FAILED")) {
+            assertFalse(code, ClientFailure(code).endsSavedLogin())
+        }
     }
 
     @Test fun firstPasskeyRefreshAfterRegistrationRecoversFromAClosedPooledConnection() = runTest {

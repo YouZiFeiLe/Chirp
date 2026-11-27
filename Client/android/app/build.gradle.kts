@@ -92,8 +92,8 @@ android {
         minSdk = 35
         targetSdk = 37
         // Android upgrades use versionCode. Chirp displays and reports the build within each versionName.
-        versionCode = 6
-        versionName = "2026.11.24"
+        versionCode = 9
+        versionName = "2026.11.27"
         buildConfigField("int", "CLIENT_BUILD", "1")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }

@@ -20,13 +20,18 @@ public sealed partial class MainPage
         input.TextChanged += (_, _) => Validate(); Validate();
         return await box.ShowAsync() == ContentDialogResult.Primary ? input.Text.Trim() : null;
     }
-    private Button SettingsRow(string title, string detail, string glyph, Func<Task> action)
+    private static Grid SettingsRowContent(string title, string detail, Border icon, string trailingGlyph)
     {
         var copy = Stack(Text(title, 15, "ChirpHeading"), Secondary(detail));
         copy.Spacing = 2;
+        return Line(copy, icon, Glyph(trailingGlyph, 12));
+    }
+
+    private Button SettingsRow(string title, string detail, string glyph, Func<Task> action)
+    {
         var button = ActionButton(title, action);
         button.Style = Design("ChirpSurfaceButton");
-        button.Content = Line(copy, IconTile(glyph), Glyph("\uE76C", 12));
+        button.Content = SettingsRowContent(title, detail, IconTile(glyph), "\uE76C");
         AutomationProperties.SetName(button, title);
         AutomationProperties.SetHelpText(button, detail);
         return button;
@@ -54,6 +59,26 @@ public sealed partial class MainPage
 
     private ComboBox? themeChoice;
 
+    private Border RepositoryLink()
+    {
+        const string address = "https://github.com/YouZiFeiLe/Chirp";
+        var title = T("项目地址", "Project URL");
+        var markTemplate = (DataTemplate)Application.Current.Resources["GitHubMark"];
+        var mark = (UIElement)markTemplate.LoadContent();
+        var link = new HyperlinkButton
+        {
+            NavigateUri = new Uri(address),
+            Content = SettingsRowContent(title, address, IconTile(mark), "\uE8A7"),
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            HorizontalContentAlignment = HorizontalAlignment.Stretch,
+            Padding = new Thickness(12)
+        };
+        AutomationProperties.SetAutomationId(link, "ProjectRepository");
+        AutomationProperties.SetName(link, title);
+        AutomationProperties.SetHelpText(link, address);
+        return new Border { Style = Design("ChirpCard"), Padding = new Thickness(0), Child = link };
+    }
+
     private void RenderSettings()
     {
         var id = member.Str("id");
@@ -80,7 +105,8 @@ public sealed partial class MainPage
             SettingsGroup(T("常规", "General"),
                 SettingsRow(T("声音设置", "Audio settings"), T("麦克风、扬声器与语音激活", "Microphone, speakers and voice activation"), "\uE9E9", AudioSettings),
                 SettingsPicker(T("外观", "Appearance"), "\uE771", theme),
-                SettingsPicker(T("界面语言", "Display language"), "\uE775", lang)),
+                SettingsPicker(T("界面语言", "Display language"), "\uE775", lang),
+                RepositoryLink()),
             SettingsGroup(T("存储", "Storage"),
                 SettingsRow(T("日志管理", "Log management"), T("记录、导出和清除脱敏日志", "Record, export and clear redacted logs"), "\uE7C3", LogSettings),
                 SettingsRow(T("附件缓存", "Attachment cache"), T("查看占用空间与清理缓存", "View disk usage and clear cached files"), "\uE8B7", CacheSettings)));
@@ -97,12 +123,22 @@ public sealed partial class MainPage
             SettingsRow(T("管理设备", "Manage devices"), T("查看、重命名和撤销已授权设备", "View, rename and revoke authorized devices"), "\uE772", Devices),
             approveDeviceButton,
             SettingsRow(T("黑名单", "Blacklist"), T("查看已禁用的账号和设备", "Review blocked accounts and devices"), "\uE8F8", Blacklist));
+        if (resumption is "available" or "enabled")
+        {
+            var enabled = resumption == "enabled";
+            var hello = SettingsRow(enabled ? T("Windows Hello 已启用", "Windows Hello is enabled") : T("启用 Windows Hello", "Enable Windows Hello"),
+                T("在登录有效期内使用 Windows Hello 解锁", "Unlock with Windows Hello when reopening Chirp while your sign-in is valid."),
+                "\uE72E", EnableLoginResumption);
+            AutomationProperties.SetAutomationId(hello, "EnableLoginResumption");
+            hello.IsEnabled = !enabled;
+            account.Children.Add(hello);
+        }
 
         var local = SettingsGroup(T("本机身份与数据", "Local identity and data"),
             SettingsRow(T("退出登录", "Sign out"), T("结束这台电脑上的登录和通话", "End your session and call on this PC"), "\uF3B1", async () =>
             {
                 if (!await Confirm(T("退出登录", "Sign out"), T("结束本次登录和通话。", "End this sign-in and leave your call."), T("退出", "Sign out"))) return;
-                var logout = Rpc("logout");
+                var logout = ForgetLogin();
                 SignedOut();
                 await logout;
             }),

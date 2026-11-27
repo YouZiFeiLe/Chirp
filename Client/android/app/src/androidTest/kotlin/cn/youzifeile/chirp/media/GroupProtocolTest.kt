@@ -141,7 +141,18 @@ class GroupProtocolTest {
         assertEquals(SetupStep.Resume, confirmed.step)
         confirmed.resume(password)
         assertEquals(SetupStep.Activate, confirmed.step)
-        val login = confirmed.finish(requireClock)
+        val activation = confirmed.finish(requireClock, requestResumption = true)
+        val resumption = requireNotNull(activation.saved)
+        val (resumedSession, _) = resumption.restore(server, http, { origin, account ->
+            IdentitySetup.loadRecord(vault, IdentitySetup.scope(origin, account)).active
+        }, requireClock)
+        val login = resumedSession.login
+        assertEquals(activation.login.identity, login.identity)
+        assertEquals(activation.login.expiresAt, login.expiresAt)
+        assertNotEquals(activation.login.credential, login.credential)
+        resumedSession.validateLogin()
+        val previousBearer = SessionRepository(connection, activation.login, http)
+        assertEquals(401, (runCatching { previousBearer.validateLogin() }.exceptionOrNull() as? ChirpException)?.status)
         assertEquals(rebuilt.device, login.device)
         val saved = vault.savedIdentities().single { it.scope == scope }
         assertEquals(rebuilt.device.accountKey, saved.root)
@@ -182,7 +193,9 @@ class GroupProtocolTest {
                 val child = requireNotNull(candidate.approval)
                 assertFalse(child.certificates.last().canEnroll)
                 pairing.paired(child)
-                val childLogin = pairing.finish(requireClock)
+                val childActivation = pairing.finish(requireClock)
+                assertNull(childActivation.saved)
+                val childLogin = childActivation.login
                 assertEquals(child, childLogin.device)
                 val secondary = account(childLogin, requireNotNull(pairing.record.active))
                 secondary.refresh()
@@ -196,7 +209,7 @@ class GroupProtocolTest {
         recovery.restore(backup, password)
         assertEquals(previous.device.accountKey, recovery.record.candidate?.device?.accountKey)
         assertNotEquals(previous.device.leaf, recovery.record.candidate?.device?.leaf)
-        val recovered = account(recovery.finish(requireClock), requireNotNull(recovery.record.active))
+        val recovered = account(recovery.finish(requireClock).login, requireNotNull(recovery.record.active))
         recovered.refresh()
         assertTrue(recovered.view.value.synced)
         assertTrue(previous.device.leaf in recovered.view.value.devices)

@@ -7,6 +7,12 @@ using Concentus.Enums;
 using Windows.Graphics.Imaging;
 using Windows.Storage.Streams;
 
+if (args.Contains("--hello-probe") || args.Contains("--hello-unlock"))
+{
+    await LoginResumptionChecks.CheckProvider(args.Contains("--hello-unlock"));
+    return;
+}
+LoginResumptionChecks.CheckLock();
 await FollowupChecks.Run();
 await NetworkClockChecks.Run();
 

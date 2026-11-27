@@ -263,10 +263,13 @@ class RoomParityUiTest {
         for (lang in listOf("en", "zh-CN")) {
             compose.runOnIdle { tag = lang; failure = ClientFailure("ATTACHMENT_QUOTA", 37) }
             val catalog = localized(lang).resources.getStringArray(R.array.client_error_messages)
-            assertEquals(145, catalog.map { it.substringBefore('=') }.toSet().size)
+            assertEquals(148, catalog.map { it.substringBefore('=') }.toSet().size)
             val quota = catalog.single { it.startsWith("ATTACHMENT_QUOTA=") }.substringAfter('=')
             assertTrue(quota.contains("20 MiB") && quota.contains("100 MiB"))
             compose.onNodeWithText(quota + localized(lang).getString(R.string.retry_after, 37)).assertExists()
+            val retryUnlock = catalog.single { it.startsWith("RESUMPTION_PROOF_INVALID=") }.substringAfter('=')
+            compose.runOnIdle { failure = ClientFailure("RESUMPTION_PROOF_INVALID") }
+            compose.onNodeWithText(retryUnlock).assertExists()
             val policy = VersionPolicy(ClientVersion("3.0.0", 220), ClientVersion("2.0.0", 123))
             compose.runOnIdle { failure = ClientFailure("CLIENT_UPDATE_REQUIRED", policy = policy) }
             compose.onNodeWithText(localized(lang).getString(R.string.version_policy, "3.0.0", "220", "2.0.0", "123"),

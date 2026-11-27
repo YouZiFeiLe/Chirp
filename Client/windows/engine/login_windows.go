@@ -3,10 +3,12 @@ package main
 import (
 	"context"
 	"crypto/ed25519"
+	"crypto/rsa"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"math"
+	"net/http"
 	"net/url"
 	"strings"
 	"time"
@@ -17,6 +19,8 @@ import (
 )
 
 type loginFlow struct {
+	wrappingKey                *rsa.PublicKey
+	offerResumption            bool
 	verifier, state, requestID string
 	phone                      bool
 	backupUnlocked             bool
@@ -133,9 +137,15 @@ func (e *engine) begin(ctx context.Context, phone bool) (obj, error) {
 	if e.conn == nil || e.session != nil {
 		return nil, invalid
 	}
-	c, err := e.refreshConnection(ctx)
-	if err != nil {
-		return nil, err
+	c := e.conn
+	// The Connect button already verified discovery, version, origins and health.
+	// A restored connection has no in-process verification time.
+	if time.Since(c.verifiedAt) >= time.Minute {
+		var err error
+		c, err = e.refreshConnection(ctx)
+		if err != nil {
+			return nil, err
+		}
 	}
 	if phone && !c.phone {
 		return nil, invalid
@@ -153,7 +163,7 @@ func (e *engine) begin(ctx context.Context, phone bool) (obj, error) {
 		Expires  int64  `json:"expires_at"`
 		Interval int
 	}
-	_, err = request(ctx, "startPhoneLogin", "POST", c.endpoints.DeviceStartURL, obj{"client_id": store.WindowsClientID, "code_challenge": challenge(f.verifier), "code_challenge_method": "S256"}, "", nil, &r, 65536)
+	_, err := request(ctx, "startPhoneLogin", "POST", c.endpoints.DeviceStartURL, obj{"client_id": store.WindowsClientID, "code_challenge": challenge(f.verifier), "code_challenge_method": "S256"}, "", nil, &r, 65536)
 	if err != nil {
 		return nil, err
 	}
@@ -201,7 +211,13 @@ func (e *engine) claim(ctx context.Context, callback string, deferred bool) (obj
 		if err != nil || u.String() != store.WindowsClientRedirectURI || len(q) != 2 || len(q["state"]) != 1 || len(q["code"]) != 1 || q.Get("state") != f.state || !tokenRE.MatchString(q.Get("code")) {
 			return nil, errors.New("INVALID_LOGIN_CALLBACK")
 		}
-		ep = e.conn.endpoints.TokenURL
+		// Recheck the confirmed origins and version before sending the code and
+		// PKCE verifier, without delaying the opening of a recently checked URL.
+		c, err := e.refreshConnection(ctx)
+		if err != nil {
+			return nil, err
+		}
+		ep = c.endpoints.TokenURL
 		body = obj{"client_id": store.WindowsClientID, "redirect_uri": store.WindowsClientRedirectURI, "code_verifier": f.verifier, "code": q.Get("code")}
 	}
 	var setup store.IdentitySetup
@@ -537,11 +553,18 @@ func (e *engine) activate(ctx context.Context, d *deviceKey) (obj, error) {
 	body := obj{"setup_token": s.Token, "code_verifier": e.flow.verifier, "device": d.Device}
 	body["signature"] = d.sign(identity.ActivationMessage(s.Origin, s.AccountID, store.WindowsClientID, s.Token, e.flow.verifier, challenge, d.Device))
 	body["device_name"] = "Windows"
-	var result session
-	if _, err := request(ctx, "completeIdentity", "POST", e.conn.origin+"/api/client/identity/complete", body, "", nil, &result, 65536); err != nil {
+	var result struct {
+		session
+		ResumeToken json.RawMessage `json:"resume_token"`
+	}
+	headers := http.Header{"Cache-Control": {"no-store"}}
+	if e.flow.offerResumption && e.loginPath != "" {
+		headers.Set("X-Chirp-Login-Resumption", "1")
+	}
+	if _, err := request(ctx, "completeIdentity", "POST", e.conn.origin+"/api/client/identity/complete", body, "", headers, &result, 65536); err != nil {
 		return nil, err
 	}
-	if result.Member.ID != s.AccountID || result.Device.Hash() != d.Device.Hash() || !strings.HasPrefix(result.Identity, s.AccountID+".login_") || len(result.Credential) != 49 || !strings.HasPrefix(result.Credential, "chirp_") || result.Expires <= time.Now().Unix() || result.Expires > time.Now().Add(20*time.Hour+time.Minute).Unix() {
+	if !result.validFor(s.AccountID, d.Device, time.Now()) {
 		return nil, invalid
 	}
 	before := *e.account
@@ -556,11 +579,25 @@ func (e *engine) activate(ctx context.Context, d *deviceKey) (obj, error) {
 		*e.account = before
 		return nil, err
 	}
+	online := e.acceptLogin(&result.session)
+	online["resumption"] = e.receiveLoginGrant(e.flow, result.ResumeToken)
 	e.flow = nil
-	e.session = &result
 	installationLog.record(epoch, logEntry{op: logOp{"account", "loginAccepted"}, outcome: "succeeded"})
+	return online, nil
+}
+
+func (s *session) validFor(account string, device identity.Device, now time.Time) bool {
+	chain := device.Certificates
+	return len(chain) != 0 && s.Member.ID == account && s.Device.Hash() == device.Hash() &&
+		strings.HasPrefix(s.Identity, account+".login_") && len(s.Identity) > len(account+".login_") &&
+		strings.HasPrefix(s.Credential, "chirp_") && validNonce(strings.TrimPrefix(s.Credential, "chirp_")) &&
+		s.Expires > now.Unix() && s.Expires <= chain[len(chain)-1].NotAfter && s.Expires <= now.Add(store.ClientCredentialTTL+time.Minute).Unix()
+}
+
+func (e *engine) acceptLogin(s *session) obj {
+	e.session = s
 	e.auth = authority{friends: e.account.Friends}
-	return obj{"step": "signedIn", "member": result.Member, "canEnroll": e.canEnroll()}, nil
+	return obj{"step": "signedIn", "member": s.Member, "canEnroll": e.canEnroll(), "expires": s.Expires, "login": s.Identity}
 }
 func routeKey(value string) (string, error) {
 	b, ok := identity.Bytes(value, 32)

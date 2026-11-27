@@ -75,10 +75,11 @@ func pkceText(value string) bool {
 }
 
 type ClientLogin struct {
-	Member     Member          `json:"member"`
-	Credential string          `json:"credential"`
-	ExpiresAt  int64           `json:"expires_at"`
-	Device     identity.Device `json:"device_identity"`
+	Member      Member          `json:"member"`
+	Credential  string          `json:"credential"`
+	ExpiresAt   int64           `json:"expires_at"`
+	Device      identity.Device `json:"device_identity"`
+	ResumeToken string          `json:"resume_token,omitempty"`
 }
 
 // After assertion verification, the Passkey credential update and one-time code

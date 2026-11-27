@@ -4,6 +4,7 @@ package cn.youzifeile.chirp.data
 
 import cn.youzifeile.chirp.BuildConfig
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import okhttp3.HttpUrl
@@ -71,6 +72,19 @@ internal data class Login(
         verify(credential.startsWith("chirp_") && tokenPattern.matches(credential.removePrefix("chirp_")) &&
             identity.matches(Regex("member_[A-Za-z0-9_-]{16}\\.login_[A-Za-z0-9_-]{16}")) &&
             validName(name) && expiresAt > now && expiresAt <= now + 20 * 3600 + 60)
+    }
+
+    companion object {
+        fun fromResponse(response: JsonObject, account: String, device: DeviceIdentity): Login {
+            val member = response.obj("member")
+            val login = Login(response.text("credential"), response.text("participant_identity"), member.text("display_name"),
+                response.long("expires_at"), response.obj("device_identity").decode<DeviceIdentity>())
+            verify(member.bool("enabled"), "MEMBER_DISABLED")
+            verify(member.text("id") == account && login.memberID == account && login.device == device &&
+                login.expiresAt <= device.deadline, "CLIENT_INVALID_LOGIN_SESSION")
+            login.validate()
+            return login
+        }
     }
 }
 

@@ -1,8 +1,11 @@
 package cn.youzifeile.chirp.ui
 
 import cn.youzifeile.chirp.data.LogEvent
+import android.content.ActivityNotFoundException
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -46,12 +49,15 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.core.net.toUri
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import cn.youzifeile.chirp.BuildConfig
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import cn.youzifeile.chirp.R
 import cn.youzifeile.chirp.data.validName
 import cn.youzifeile.chirp.media.CallState
+
+private const val PROJECT_REPOSITORY_URL = "https://github.com/YouZiFeiLe/Chirp"
 
 @Composable
 internal fun AccountScreen(
@@ -100,6 +106,10 @@ internal fun AccountScreen(
         SettingsGroup(stringResource(R.string.about)) {
             SettingRow(R.drawable.ic_waveform, stringResource(R.string.version),
                 stringResource(R.string.version_with_build, BuildConfig.VERSION_NAME, BuildConfig.CLIENT_BUILD))
+            SettingsDivider()
+            SettingRow(R.drawable.ic_github, stringResource(R.string.project_link), PROJECT_REPOSITORY_URL,
+                onClick = { openProjectRepository(activity) }, supportingColor = colors.primary,
+                onClickLabel = stringResource(R.string.view_project_on_github))
         }
         SettingsGroup {
             SettingRow(R.drawable.ic_logout, stringResource(R.string.sign_out), onClick = { signOut = true },
@@ -113,6 +123,21 @@ internal fun AccountScreen(
             R.string.sign_out_question, body, R.string.sign_out,
             close = { signOut = false }, action = model::logout, icon = R.drawable.ic_account,
         )
+    }
+}
+
+private fun openProjectRepository(activity: ComponentActivity) {
+    val intent = Intent(Intent.ACTION_VIEW, PROJECT_REPOSITORY_URL.toUri()).addCategory(Intent.CATEGORY_BROWSABLE).apply {
+        // Resolve a general HTTPS browser even when another app handles GitHub links.
+        selector = Intent(Intent.ACTION_VIEW, "https:".toUri()).addCategory(Intent.CATEGORY_BROWSABLE)
+    }
+    fun showBrowserError() = Toast.makeText(activity, R.string.project_link_browser_error, Toast.LENGTH_LONG).show()
+    try {
+        activity.startActivity(intent)
+    } catch (_: ActivityNotFoundException) {
+        showBrowserError()
+    } catch (_: SecurityException) {
+        showBrowserError()
     }
 }
 

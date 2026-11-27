@@ -55,10 +55,6 @@
 
 ---
 
-> **Compliance & Legal Notice**
->
-> This project is released for technical sharing. The author does not operate any public communication service, does not provide ongoing technical support, and receives no revenue or consideration. Before using this project, please read [`COMPLIANCE.md`](./COMPLIANCE.md), which sets out the project's positioning, cryptography export-control posture, GDPR alignment, and use boundaries under PRC law. By using, copying, distributing, or deploying this project, you acknowledge that you have read and understood that document in its entirety.
-
 ## 👋 A Note from the Author & Why Chirp Exists
 
 > I originally started building **Chirp** to replace the TeamSpeak setup I was using with friends.
@@ -162,18 +158,6 @@ Deployment guides, per-platform client architecture, the V5 E2EE protocol spec, 
 | 🛠️ **Build from source & test** | [Server Build & Testing](https://chirp.youzifeile.com/en/development/building) · [Native Client Builds](https://chirp.youzifeile.com/en/development/clients) · [Manual QA Checklist](https://chirp.youzifeile.com/en/development/testing) |
 
 ---
-
-## Compliance & Legal Notice
-
-The complete compliance statement for this project is set out in [`COMPLIANCE.md`](./COMPLIANCE.md), covering:
-
-- Project positioning and boundary: the author does not operate a public service, provide ongoing support, or receive revenue;
-- Cryptography and export-control posture;
-- Data protection by design (GDPR Article 25 alignment);
-- Commercial cryptography status under PRC law, no-subsequent-involvement commitment, and prohibited uses;
-- General disclaimer.
-
-That document, together with [`LICENSE`](./LICENSE), forms the legal texts that should be read when using this project.
 
 ## 📈 Repository Activity & License
 

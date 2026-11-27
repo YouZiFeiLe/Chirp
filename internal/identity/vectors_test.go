@@ -34,6 +34,12 @@ func TestV5CrossLanguageVectors(t *testing.T) {
 	if v.Device.Validate(now) != nil || v.Policy.Validate(now) != nil || v.Binding.Validate(v.Policy, now) != nil || v.Login.Validate("chirp-apple", "authorization-vector", "pkce-verifier-vector", now) != nil {
 		t.Fatal("vector signature invalid")
 	}
+	// Shared with the native login resumption integration guide.
+	resume := identity.ResumptionMessage("https://keys.example.test:443", "android", "member_fixture.login_fixture",
+		"resume-v1_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8", "ICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8", v.Device)
+	if got := identity.Hash(resume); got != "nOrZz5uNpOPV7sgnW/wGZ26KFdcd0z3Z4+6I2reXpr8=" {
+		t.Fatalf("login resumption vector digest = %s", got)
+	}
 	for name, message := range map[string][]byte{"certificate": v.Device.Certificates[0].Message(), "policy": v.Policy.Message(), "binding": v.Binding.Message(), "offer": v.Offer.Message(), "ready": v.Ready.Message(), "login": v.Login.Message("chirp-apple", "authorization-vector", "pkce-verifier-vector")} {
 		if base64.StdEncoding.EncodeToString(message) != v.Messages[name] {
 			t.Fatal("canonical message differs", name)

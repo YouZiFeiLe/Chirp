@@ -247,7 +247,7 @@ internal class IdentitySetup(
         save(record.copy(candidate = next, backup = null, exported = false, confirmed = false))
     }
 
-    suspend fun finish(requireClock: () -> Unit): Login {
+    suspend fun finish(requireClock: () -> Unit, requestResumption: Boolean = false): ActivatedLogin {
         requireClock()
         grant.validate(connection)
         verify(step == SetupStep.Activate, "IDENTITY_INVALID")
@@ -259,8 +259,13 @@ internal class IdentitySetup(
         val body = buildJsonObject {
             put("setup_token", grant.token); put("code_verifier", verifier); put("device", local.device.toWire())
         }
-        suspend fun post(action: String, value: JsonObject) = http.json(
-            connection.passkeyOrigin.path("api", "client", "identity", action).request().clientVersion().jsonPost(value).build(), operation = if (action == "challenge") LogEvent.identityChallenge else LogEvent.identityComplete).second
+        suspend fun post(action: String, value: JsonObject): JsonObject {
+            val request = connection.passkeyOrigin.path("api", "client", "identity", action).request().clientVersion()
+                .header("Cache-Control", "no-store")
+            if (action == "complete" && requestResumption) request.header("X-Chirp-Login-Resumption", "1")
+            return http.json(request.jsonPost(value).build(),
+                operation = if (action == "challenge") LogEvent.identityChallenge else LogEvent.identityComplete).second
+        }
         val challenge = post("challenge", body).text("challenge")
         requireClock()
         val proof = message("Chirp identity activation v1", grant.origin, grant.account, "chirp-android",
@@ -269,15 +274,11 @@ internal class IdentitySetup(
         val response = post("complete", buildJsonObject {
             body.forEach { (k,v) -> put(k,v) }; put("signature", local.sign(proof)); put("device_name", Build.MODEL.take(64))
         })
-        val member = response.obj("member")
-        val login = Login(response.text("credential"), response.text("participant_identity"), member.text("display_name"),
-            response.long("expires_at"), response.obj("device_identity").decode<DeviceIdentity>())
-        login.validate()
-        verify(login.device == local.device && member.bool("enabled") && member.text("id") == grant.account &&
-            login.memberID == grant.account, "IDENTITY_INVALID")
+        val login = Login.fromResponse(response, grant.account, local.device)
         rememberIdentity(local)
         save(SetupRecord(active = local))
-        return login
+        val saved = if (requestResumption) SavedLogin.fromActivation(response, login, connection) else null
+        return ActivatedLogin(login, saved)
     }
     suspend fun pairingStart(request: JsonObject): JsonObject = http.json(connection.passkeyOrigin.path("api","client","identity","pairing","start")
         .request().clientVersion().jsonPost(buildJsonObject {

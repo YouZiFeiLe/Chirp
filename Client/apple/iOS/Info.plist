@@ -27,7 +27,7 @@
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>将设备授权二维码保存到你的照片图库，方便在另一台设备上导入。</string>
 	<key>NSFaceIDUsageDescription</key>
-	<string>用于在批准新设备授权前验证您的本机身份，也可使用设备解锁密码完成验证。</string>
+	<string>用于在返回 Chirp 时解锁登录会话，以及在批准新设备前验证你的身份。</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>连接你配置的自托管语音服务器。</string>
 	<key>UIBackgroundModes</key>

@@ -46,6 +46,7 @@ public sealed partial class MainPage
         var reading = networkClock.Read();
         foreach (var page in App.Pages)
             if (page.loaded && !page.closed) page.RenderClock(reading);
+        UpdateUnlockActivity();
     }
 
     private void RenderClock(ClockReading reading, bool languageChanged = false)

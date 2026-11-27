@@ -1,4 +1,8 @@
 <resources>
+    <string name="unlock_prompt_detail">Verify your identity to resume your previous sign-in.</string>
+    <string name="unlock_with_fingerprint">Unlock with fingerprint</string>
+    <string name="unlock_with_biometrics">Unlock with biometrics</string>
+    <string name="login_biometrics_changed">Biometric enrollment changed. Sign in again with your passkey.</string>
     <string name="app_name">Chirp</string>
     <string name="connection_title">Connect to Chirp</string>
     <string name="clock_checking">Checking device time before sign-in or device approval…</string>
@@ -16,6 +20,7 @@
     <string name="register">Register</string>
     <string name="new_version">Chirp %1$s is available.</string>
     <string name="version_with_build">%1$s (build %2$d)</string>
+    <string name="project_link_browser_error">Could not open the project link. Check your default browser settings.</string>
     <string name="room_loading">Syncing rooms…</string>
     <string name="room_select">Pick a room</string>
     <string name="room_select_detail">Open a room to see who is there and join the conversation.</string>

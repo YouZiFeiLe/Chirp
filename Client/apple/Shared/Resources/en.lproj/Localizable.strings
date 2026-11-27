@@ -51,6 +51,7 @@
 "在线" = "Online";
 "在线状态待同步" = "Waiting for online status";
 "在线状态暂时未知" = "Online status is unavailable";
+"在 GitHub 上查看 Chirp" = "View Chirp on GitHub";
 "在这里" = "Here together";
 "声音" = "Audio";
 "声音设置" = "Audio settings";
@@ -193,6 +194,7 @@
 "选择适合当前设备的音频处理方式。" = "Choose the audio processing that works best for your device.";
 "通行密钥登录 · 端到端加密通话" = "Passkey sign-in · End-to-end encrypted calls";
 "音频预设" = "Audio preset";
+"项目地址" = "Project link";
 "预览选项" = "Preview options";
 "验证并加入" = "Verify and join";
 "麦克风已开启" = "Microphone on";
@@ -972,3 +974,12 @@
 "打开日期与时间设置" = "Open Date & Time Settings";
 "请在「设置 → 通用 → 日期与时间」中开启「自动设置」。" = "In Settings → General → Date & Time, turn on Set Automatically.";
 "重新校验" = "Check again";
+"验证本机身份以解锁 Chirp。" = "Verify your identity to unlock Chirp.";
+"验证身份，继续使用 Chirp。" = "Verify your identity to continue using Chirp.";
+"使用触控 ID 或 Mac 登录密码继续。" = "Use Touch ID or your Mac login password to continue.";
+"使用 Mac 登录密码继续。" = "Use your Mac login password to continue.";
+"正在解锁" = "Unlocking";
+"解锁 Chirp" = "Unlock Chirp";
+"使用面容 ID 解锁" = "Unlock with Face ID";
+"使用触控 ID 解锁" = "Unlock with Touch ID";
+"改用通行密钥登录" = "Sign in with a passkey instead";

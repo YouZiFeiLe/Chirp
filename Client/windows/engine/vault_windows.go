@@ -177,7 +177,11 @@ func (v *vault) save() (err error) {
 	if err != nil {
 		return err
 	}
-	f, err := os.CreateTemp(filepath.Dir(v.path), ".identity-*")
+	return writePrivateFile(v.path, ".identity-*", data)
+}
+
+func writePrivateFile(path, pattern string, data []byte) error {
+	f, err := os.CreateTemp(filepath.Dir(path), pattern)
 	if err != nil {
 		return err
 	}
@@ -192,7 +196,7 @@ func (v *vault) save() (err error) {
 	if closed != nil {
 		return closed
 	}
-	return os.Rename(f.Name(), v.path)
+	return os.Rename(f.Name(), path)
 }
 func (d *deviceKey) sign(message []byte) string {
 	key := ed25519.NewKeyFromSeed(d.Seed)

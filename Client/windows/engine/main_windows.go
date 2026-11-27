@@ -38,6 +38,7 @@ type command struct {
 	Args              args
 	span              logSpan
 	join              *joinAttempt
+	resume            *resumeAttempt
 	suspensionApplied bool
 }
 type engine struct {
@@ -57,6 +58,11 @@ type engine struct {
 	audio               atomic.Pointer[mediaSession]
 	fileScope           atomic.Pointer[attachmentSession]
 	joins               joinRequests
+	loginPath           string
+	pendingLoginGrant   string // Held only for the current online session until the user enables Hello.
+	resuming            atomic.Pointer[resumeAttempt]
+	pendingResume       *pendingResume
+	resumedID           string
 	pairing             *pairing
 	notify              func(string, any)
 	directoryRev        uint64
@@ -69,17 +75,45 @@ type engine struct {
 
 func (e *engine) handle(ctx context.Context, c command) (any, error) {
 	a := c.Args
-	if e.vault != nil && e.vault.unavailable && c.Op != "clearLocalData" {
+	if e.vault != nil && e.vault.unavailable && c.Op != "clearLocalData" && c.Op != "logout" {
 		return nil, errors.New("IDENTITY_STORE_UNAVAILABLE")
 	}
 	switch c.Op {
+	case "checkLogin":
+		if e.session != nil && time.Now().Unix() >= e.session.Expires {
+			return nil, errSessionExpired
+		}
+		return nil, nil
+	case "savedLogin":
+		sealed, err := e.readSavedLogin()
+		if err != nil || sealed == nil {
+			return nil, err
+		}
+		return obj{"expires": sealed.Expires, "wrappedKey": sealed.WrappedKey}, nil
+	case "resumeLogin":
+		return nil, e.prepareResume(c.resume, a.File)
+	case "commitResume":
+		return e.commitResume(a.ID)
+	case "cancelResume":
+		if p := e.pendingResume; p != nil && p.attempt.id == a.ID {
+			e.pendingResume = nil
+		}
+		if a.ID != "" && e.resumedID == a.ID {
+			e.reset(ctx)
+		}
+		return nil, nil
+	case "logout":
+		return nil, e.logout(ctx)
 	case "clearLocalData":
+		err := e.logout(ctx)
+		if err != nil && err.Error() == "LOGIN_STORAGE_UNAVAILABLE" {
+			return nil, err
+		}
 		if installationLog != nil {
 			if err := installationLog.sync(func() error { return installationLog.clear(true) }); err != nil {
 				return nil, errors.New("LOG_STORAGE_UNAVAILABLE")
 			}
 		}
-		e.reset(ctx)
 		if err := os.Remove(e.vault.path); err != nil && !os.IsNotExist(err) {
 			return nil, err
 		}
@@ -143,6 +177,9 @@ func (e *engine) handle(ctx context.Context, c command) (any, error) {
 	case "browser", "phone":
 		return e.begin(ctx, c.Op == "phone")
 	case "exchange":
+		if e.flow != nil && !e.flow.phone {
+			e.flow.setResumption(a)
+		}
 		return e.exchange(ctx, a.URL)
 	case "pollPhone", "finishPhone":
 		if e.flow == nil || a.ID == "" || e.flow.state != a.ID || !e.flow.phone {
@@ -154,6 +191,7 @@ func (e *engine) handle(ctx context.Context, c command) (any, error) {
 		if e.flow.setup.AccountID == "" {
 			return nil, invalid
 		}
+		e.flow.setResumption(a)
 		return e.continueSetup(ctx)
 	case "cancelLogin":
 		if a.ID != "" && (e.flow == nil || e.flow.state != a.ID) {
@@ -185,6 +223,8 @@ func (e *engine) handle(ctx context.Context, c command) (any, error) {
 		return nil, errors.New("LOGIN_REQUIRED")
 	}
 	switch c.Op {
+	case "enableLoginResumption":
+		return nil, e.saveLoginForRelaunch(a.ID, loginWrappingKey(a.File))
 	case "watchDirectory":
 		if e.stopDirectory == nil {
 			watchCtx, cancel := context.WithCancel(ctx)
@@ -395,14 +435,25 @@ func (e *engine) handle(ctx context.Context, c command) (any, error) {
 		return e.ownProfile(ctx, c)
 	case "getAvatar":
 		return fetchAvatar(ctx, e.conn, e.session.Credential, a)
-	case "logout":
-		owner, endpoint := e.session, e.conn.api("v1/logout")
-		installationLog.record(installationLog.epoch(), logEntry{op: logOp{"account", "sessionEnded"}})
-		e.reset(ctx)
-		_, err := request(ctx, "logout", "POST", endpoint, nil, owner.Credential, nil, nil, 65536)
-		return nil, err
 	}
 	return nil, errors.New("UNKNOWN_COMMAND")
+}
+
+func (e *engine) logout(ctx context.Context) error {
+	localErr := e.forgetSavedLogin()
+	owner, conn := e.session, e.conn
+	if p := e.pendingResume; owner == nil && p != nil {
+		owner, conn = &p.login, p.conn
+	}
+	e.reset(ctx)
+	if owner != nil {
+		installationLog.record(installationLog.epoch(), logEntry{op: logOp{"account", "sessionEnded"}})
+		_, err := request(ctx, "logout", "POST", conn.api("v1/logout"), nil, owner.Credential, nil, nil, 65536)
+		if localErr == nil {
+			return err
+		}
+	}
+	return localErr
 }
 func (e *engine) canEnroll() bool {
 	chain := e.session.Device.Certificates
@@ -449,6 +500,9 @@ func (e *engine) roomView() any {
 	return obj{"entry": r.join.Identity, "informationObservedAt": observed, "informationUnavailable": unavailable, "cacheRevision": cacheRevision, "room": r.join.Room, "group": group, "status": r.status, "ready": ready, "deadline": deadline, "leaseRevision": leaseRevision, "muted": muted, "peers": peers, "verification": r.verification, "canRetryVerification": e.canRetryVerification(r), "information": info}
 }
 func (e *engine) reset(ctx context.Context) {
+	e.stopResume("")
+	e.pendingResume, e.resumedID = nil, ""
+	e.pendingLoginGrant = ""
 	if e.stopLoginWatch != nil {
 		e.stopLoginWatch(nil)
 		e.loginLifetime, e.stopLoginWatch = nil, nil
@@ -476,6 +530,7 @@ func (e *engine) endLogin(ctx context.Context, owner *session, reason string) bo
 		media.pause()
 	}
 	installationLog.record(installationLog.epoch(), logEntry{op: logOp{"account", "sessionEnded"}, code: safeLogError(errors.New(reason))})
+	_ = e.forgetSavedLogin()
 	e.notify("signedOut", reason)
 	e.reset(ctx)
 	return true
@@ -563,7 +618,7 @@ func main() {
 	}
 	inbox := newActorMailbox[chatDelivery]()
 	revoked := make(chan struct{}, 1)
-	e := engine{vault: v, cache: cache, trustKey: pin, local: *local}
+	e := engine{vault: v, cache: cache, trustKey: pin, local: *local, loginPath: filepath.Join(*logCache, "saved-login.v1")}
 	e.notify = func(name string, data any) {
 		switch name {
 		case "chat":
@@ -669,7 +724,7 @@ func main() {
 				}
 			}
 			owner := e.session
-			if c.Op == "logout" || c.Op == "clearLocalData" {
+			if c.Op == "logout" || c.Op == "clearLocalData" || c.Op == "cancelResume" {
 				work = root // Completing local sign-out also cancels the login lifetime.
 			}
 			result, err := e.handle(work, c)
@@ -689,6 +744,11 @@ func main() {
 		case <-roomDue:
 			e.updateRoom(root, work)
 		case <-ticker.C:
+			if p := e.pendingResume; p != nil && time.Now().Unix() >= p.login.Expires {
+				p.attempt.cancel()
+				e.pendingResume = nil
+				_ = e.forgetSavedLogin()
+			}
 			if e.session != nil && time.Now().Unix() >= e.session.Expires {
 				e.endLogin(root, e.session, "CLIENT_LOGIN_EXPIRED")
 				continue

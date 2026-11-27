@@ -55,10 +55,6 @@
 
 ---
 
-> **合规与法律声明**
->
-> 本项目以技术分享为目的，作者不运营任何公开通信服务、不提供持续技术支持、不获取收入或对价。使用本项目前，请阅读 [`COMPLIANCE.md`](./COMPLIANCE.md)，其中包含项目定位、密码学出口管制、GDPR 对接说明及中国法下的使用边界。使用、复制、分发或部署本项目，即表示你已阅读并理解该文件全部内容。
-
 ## 👋 开发者的话 & 项目初衷
 
 > 我开发 **Chirp** 的初衷，其实是想替代掉自己一直在使用的 TeamSpeak。
@@ -162,18 +158,6 @@ sudo docker compose up -d --wait --wait-timeout 600
 | 🛠️ **从源码构建或二次开发** | [服务端本地构建](https://chirp.youzifeile.com/development/building) · [各平台客户端构建](https://chirp.youzifeile.com/development/clients) · [人工验收清单](https://chirp.youzifeile.com/development/testing) |
 
 ---
-
-## 合规与法律声明
-
-本项目的完整合规声明见 [`COMPLIANCE.md`](./COMPLIANCE.md)，包括：
-
-- 项目定位与边界：作者不运营公开服务、不提供持续支持、不获取收入；
-- 密码学与出口管制立场；
-- 数据保护设计（GDPR 第 25 条对接）说明；
-- 中国法律框架下的商用密码定位、不提供后续介入承诺及禁止性使用条款；
-- 一般免责声明。
-
-该文件与 [`LICENSE`](./LICENSE) 一并构成使用本项目时应阅读的法律文本。
 
 ## 📈 仓库动态与开源协议
 

@@ -3,6 +3,7 @@ package cn.youzifeile.chirp.data
 import cn.youzifeile.chirp.media.EntryBinding
 import cn.youzifeile.chirp.media.GroupMember
 import cn.youzifeile.chirp.media.rosterHash
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -39,5 +40,19 @@ class IdentityVectorTest {
         assertEquals(sample.text("context"),request.context())
         assertEquals(sample.text("request_digest"),request.hash())
         assertThrows(ChirpException::class.java) { verifySignature(request.key,request.signature,request.copy(origin = "https://other.test:443").message()) }
+    }
+
+    @Test fun androidLoginResumptionMatchesGoVector() {
+        val device = vector("v5.json").obj("device").decode<DeviceIdentity>()
+        val origin = "https://keys.example.test/".toHttpUrl()
+        val connection = ServerConnection(origin, origin, origin, null, origin, origin, origin, origin, "main", null)
+        val token = "resume-v1_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8"
+        val saved = SavedLogin(token, connection, "member_fixture", "member_fixture.login_fixture", device.hash(), 1000)
+        assertEquals("bFSEn41asLYKn+esux2icvSTGymvnfv4xXqjZU5Nhe0=", digest(token.encodeToByteArray()))
+        assertEquals("nOrZz5uNpOPV7sgnW/wGZ26KFdcd0z3Z4+6I2reXpr8=",
+            digest(saved.proofMessage("ICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8")))
+        saved.checkDeadline(999)
+        assertThrows(ChirpException::class.java) { saved.checkDeadline(1000) }
+        assertThrows(ChirpException::class.java) { saved.proofMessage("x".repeat(43)) }
     }
 }

@@ -13,6 +13,8 @@ import (
 
 func nativeClientEndpoint(path string) bool {
 	switch path {
+	case "/api/client/resume/challenge", "/api/client/resume/complete":
+		return true
 	case "/api/client/exchange", "/api/client/device/start", "/api/client/device/poll", "/api/client/device/cancel", "/api/client/identity/challenge", "/api/client/identity/complete", "/api/client/identity/pairing/start", "/api/client/identity/pairing/action":
 		return true
 	default:

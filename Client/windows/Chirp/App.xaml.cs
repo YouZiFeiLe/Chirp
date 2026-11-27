@@ -74,6 +74,7 @@ public partial class App : Application
     {
         if (Exiting) return;
         Exiting = true;
+        MainPage.InterruptUnlock();
         try
         {
             foreach (var window in windows) window.Page.Detach();

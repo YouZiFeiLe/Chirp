@@ -322,6 +322,7 @@
   "profile_recognition": "让朋友更容易认出你",
   "profile_renamed": "昵称已更新",
   "profile_stale": "成员资料暂时无法同步，当前显示上次资料。",
+  "project_link": "项目地址",
   "quality_excellent": "网络良好",
   "quality_good": "网络正常",
   "quality_lost": "网络连接丢失",
@@ -484,6 +485,10 @@
   "trust_your_turn": "待你核验",
   "unlimited": "人数不限",
   "unlock_backup": "解锁恢复文件",
+  "unlock_chirp": "解锁 Chirp",
+  "unlock_login_intro": "验证身份，继续使用 Chirp。",
+  "unlock_with_passkey": "改用通行密钥登录",
+  "unlocking_login": "正在解锁",
   "verification_account_fp": "账号指纹",
   "verification_completed": "设备互认完成",
   "verification_expired": "核验等待超时",
@@ -499,6 +504,7 @@
   "verify_wait_others": "你已核验房间内的设备。正在等待其他成员完成互认或同步结果。",
   "version": "版本",
   "version_policy": "最新版本：%@（构建 %@）；最低支持版本：%@（构建 %@）",
+  "view_project_on_github": "在 GitHub 上查看 Chirp",
   "voice_activation": "语音激活",
   "voice_activation_enable": "启用语音激活",
   "voice_stopped": "语音已停止",
@@ -507,5 +513,6 @@
   "voice_trusted": "可信加密语音",
   "volume_local_help": "只影响你听到的声音",
   "waiting_directory": "等待房间状态",
+  "welcome_back": "欢迎回来",
   "welcome_body": "用通行密钥，和其他鸟儿相聚。"
 }

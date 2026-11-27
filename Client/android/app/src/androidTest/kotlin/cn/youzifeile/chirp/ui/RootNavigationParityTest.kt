@@ -1,5 +1,8 @@
 package cn.youzifeile.chirp.ui
 
+import android.app.Activity
+import android.app.Instrumentation
+import android.content.Intent
 import android.os.SystemClock
 import android.view.WindowInsets
 import androidx.activity.ComponentActivity
@@ -10,6 +13,7 @@ import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.test.platform.app.InstrumentationRegistry
 import cn.youzifeile.chirp.ChirpApplication
 import cn.youzifeile.chirp.R
 import cn.youzifeile.chirp.data.*
@@ -76,6 +80,37 @@ class RootNavigationParityTest {
         openTab(R.string.account)
         compose.onNodeWithText(text(R.string.log_management)).performScrollTo().performClick()
         compose.onNodeWithText(text(R.string.log_recording)).assertIsDisplayed()
+    }
+
+    @Test fun aboutChirpOpensTheDisplayedProjectUrlInABrowser() {
+        show()
+        openTab(R.string.account)
+        val url = "https://github.com/YouZiFeiLe/Chirp"
+        val row = compose.onNode(hasText(text(R.string.project_link)) and hasText(url) and hasClickAction())
+        row.performScrollTo().assertIsDisplayed()
+        assertEquals(text(R.string.view_project_on_github), row.fetchSemanticsNode().config[SemanticsActions.OnClick].label)
+
+        var opened: Intent? = null
+        val monitor = object : Instrumentation.ActivityMonitor() {
+            override fun onStartActivity(intent: Intent): Instrumentation.ActivityResult? {
+                if (intent.action != Intent.ACTION_VIEW) return null
+                opened = intent
+                return Instrumentation.ActivityResult(Activity.RESULT_OK, null)
+            }
+        }
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        instrumentation.addMonitor(monitor)
+        try {
+            row.performClick()
+            compose.runOnIdle {
+                val intent = requireNotNull(opened)
+                assertEquals(url, intent.dataString)
+                assertTrue(intent.hasCategory(Intent.CATEGORY_BROWSABLE))
+                val browser = requireNotNull(intent.selector)
+                assertEquals(Intent.ACTION_VIEW, browser.action)
+                assertEquals("https:", browser.dataString)
+            }
+        } finally { instrumentation.removeMonitor(monitor) }
     }
 
     @Test fun homeTitlesStayPinnedAndShortListsStayInPlace() {

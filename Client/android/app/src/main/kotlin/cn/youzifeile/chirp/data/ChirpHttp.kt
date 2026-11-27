@@ -195,13 +195,15 @@ private fun ResponseBody.boundedBytes(limit: Long): ByteArray {
 internal fun Request.Builder.jsonPost(value: JsonObject): Request.Builder = post(value.jsonBody())
 internal fun JsonObject.jsonBody(): RequestBody = toString().toRequestBody("application/json".toMediaType())
 
-internal class LoginCodeBody(payload: JsonObject) : RequestBody() {
+internal open class OneShotJsonBody(payload: JsonObject) : RequestBody() {
     private val json = payload.jsonBody()
     override fun contentType() = json.contentType()
     override fun contentLength() = json.contentLength()
     override fun writeTo(sink: BufferedSink) = json.writeTo(sink)
     override fun isOneShot() = true
 }
+
+internal class LoginCodeBody(payload: JsonObject) : OneShotJsonBody(payload)
 
 internal fun HttpUrl.request(credential: String? = null): Request.Builder =
     Request.Builder().url(this).header("Accept", "application/json").apply {

@@ -1,3 +1,4 @@
+import ChirpMLS
 import Foundation
 import Synchronization
 import Testing
@@ -87,6 +88,58 @@ private final class ConnectionURLProtocol: URLProtocol, @unchecked Sendable {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [ConnectionURLProtocol.self]
         return ServerConnectionAPI(configuration: configuration, identity: testClientIdentity)
+    }
+
+    @Test(arguments: ["resume-v1_", "resume_"])
+    func savedLoginProvesPossessionAtThePinnedOriginAndKeepsItsDeadline(prefix: String) async throws {
+        let origin = "https://keys.example.test:8443", account = "member_original", participant = account + ".login_original"
+        let identity = DeviceIdentityStore(persistence: MemoryIdentityPersistence())
+        try identity.select(origin: origin, accountID: account)
+        let device = try identity.makeCandidate(rootSeed: V5Crypto.random())
+        try identity.markBound()
+        let expiresAt = Date().addingTimeInterval(3600)
+        func response(_ marker: String, expiry: Date) throws -> Data {
+            try JSONSerialization.data(withJSONObject: ["member": ["id": account, "display_name": "Test"],
+                "credential": "chirp_" + String(repeating: marker, count: 43), "participant_identity": participant,
+                "device_identity": try JSONSerialization.jsonObject(with: JSONEncoder().encode(device)),
+                "expires_at": expiry.timeIntervalSince1970])
+        }
+        let connection = try ServerConnection(apiURL: testServerConnection.apiURL, passkeyOrigin: URL(string: origin)!)
+        let original = try ClientSession(data: response("a", expiry: expiresAt), connection: connection)
+        let token = prefix + String(repeating: "r", count: 43), nonce = String(repeating: "n", count: 43)
+        let ticket = try #require(SavedLogin(session: original, token: token))
+        var legacy = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(ticket)) as? [String: Any])
+        #expect(legacy["sessionExpiresAt"] == nil)
+        legacy["sessionExpiresAt"] = legacy["expiresAt"]
+        legacy["expiresAt"] = Date.distantPast.timeIntervalSinceReferenceDate
+        let older = try JSONDecoder().decode(SavedLogin.self, from: JSONSerialization.data(withJSONObject: legacy))
+        #expect(older.expiresAt == original.expiresAt)
+        let challengeURL = origin + "/api/client/resume/challenge", completeURL = origin + "/api/client/resume/complete"
+        let discovery = try api([challengeURL: .init(status: 200, body: JSONEncoder().encode(["challenge": nonce])),
+                                 completeURL: .init(status: 200, body: response("b", expiry: expiresAt.addingTimeInterval(600)))])
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [ConnectionURLProtocol.self]
+        let clock = NetworkClock(query: { [NetworkTimeSample(utc: Date(), received: .now, roundTrip: .zero)] })
+        let result = try await ticket.restore(identity: identity, clock: clock, discovery: discovery, configuration: configuration)
+        #expect(result.credential != original.credential && result.participantIdentity == participant)
+        #expect(result.expiresAt == original.expiresAt && result.expiresAt == ticket.expiresAt)
+        let posts = ConnectionURLProtocol.state.withLock { $0.requests.filter { $0.httpMethod == "POST" } }
+        #expect(posts.map { $0.url?.absoluteString } == [challengeURL, completeURL])
+        let request = try #require(posts.last)
+        let body: [String: String]
+        if let data = request.httpBody { body = try JSONDecoder().decode([String: String].self, from: data) }
+        else {
+            let stream = try #require(request.httpBodyStream)
+            stream.open()
+            defer { stream.close() }
+            body = try #require(JSONSerialization.jsonObject(with: stream) as? [String: String])
+        }
+        #expect(body["resume_token"] == token && body.count == 2)
+        let signature = try #require(body["signature"])
+        let expectedDomain = prefix == "resume-v1_" ? "Chirp login resumption v1" : "Chirp Apple login resumption v1"
+        let message = V5Crypto.message(expectedDomain, [origin, "macos", participant,
+            V5Crypto.hash(Data(token.utf8)), nonce, device.digest])
+        try V5Crypto.verify(key: device.leafKey, signature: signature, message: message)
     }
 
     @Test func freshInstallIsEmptyAndOnlySuccessfulChecksPersist() async throws {

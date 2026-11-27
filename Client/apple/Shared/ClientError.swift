@@ -47,6 +47,8 @@ enum ClientErrorCode: String, Codable, CaseIterable, Sendable {
     case invalidLoginCallback = "CLIENT_INVALID_LOGIN_CALLBACK"
     case loginVerificationFailed = "CLIENT_LOGIN_VERIFICATION_FAILED"
     case secureLoginFailed = "CLIENT_SECURE_LOGIN_FAILED"
+    case localUnlockFailed = "CLIENT_LOCAL_UNLOCK_FAILED"
+    case resumptionProofInvalid = "RESUMPTION_PROOF_INVALID"
     case invalidLoginSession = "CLIENT_INVALID_LOGIN_SESSION"
     case loginIncomplete = "CLIENT_LOGIN_INCOMPLETE"
     case loginExpired = "CLIENT_LOGIN_EXPIRED"

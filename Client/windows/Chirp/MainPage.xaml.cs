@@ -99,18 +99,24 @@ public sealed partial class MainPage : Page
             WatchAudioRoutes();
             _ = Run(async () =>
             {
-                ApplyLogState(await Rpc("logState"));
-                LogUI("login");
-                WindowActivity();
-                try { await RestoreConfirmed(); }
+                try
+                {
+                    await LoadLoginLock();
+                    await RestoreConfirmed();
+                }
                 finally
                 {
                     loginInitialized = true;
+                    UpdateLockControls();
                     foreach (var page in App.Pages) page.ResumePendingCallback();
+                    UpdateUnlockActivity();
                 }
+                ApplyLogState(await Rpc("logState"));
+                LogUI("login");
+                WindowActivity();
             });
         }
-        catch (Exception e) { ShowError(e); }
+        catch (Exception e) { loginInitialized = true; UpdateLockControls(); ShowError(e); }
     }
 
     private string T(string zh, string en) => english ? en : zh;
@@ -135,7 +141,8 @@ public sealed partial class MainPage : Page
         // A browser callback, picker or Windows Hello prompt can outlive the last clock check.
         if (op is "browser" or "exchange" or "phone" or "pollPhone" or "finishPhone" or "recover"
             or "backup" or "unlockBackup" or "backupExported" or "verifyBackup" or "finishBackup"
-            or "pairNew" or "pairOld" or "pairPoll" or "pairCheckCode" or "pairConfirm" or "finishPair")
+            or "pairNew" or "pairOld" or "pairPoll" or "pairCheckCode" or "pairConfirm" or "finishPair"
+            or "resumeLogin" or "commitResume")
             RequireNetworkClock();
         return protocol?.Send(op, args) ?? Task.FromException<JsonNode?>(new IOException("PROTOCOL_STOPPED"));
     }
@@ -149,6 +156,8 @@ public sealed partial class MainPage : Page
         Address.Header = T("服务器地址", "Server address");
         ButtonLabel(ConnectButton, T("连接服务器", "Connect to server"), "\uE774");
         ButtonLabel(Passkey, T("使用通行密钥登录", "Sign in with a passkey"), "\uE8D7");
+        ButtonLabel(UnlockButton, T("解锁 Chirp", "Unlock Chirp"), "\uE72E");
+        UsePasskey.Content = T("使用通行密钥重新登录", "Sign in again with a passkey");
         ButtonLabel(Phone, T("用手机扫码登录", "Sign in with your phone"), "\uE8EA");
         Register.Content = T("申请注册", "Request an account");
         LanguageChoice.Header = T("界面语言", "Display language");
@@ -178,11 +187,21 @@ public sealed partial class MainPage : Page
     private void UpdateLoginStage()
     {
         var confirmed = connection is not null;
-        LoginHeading.Text = confirmed ? T("登录 Chirp", "Sign in to Chirp") : T("连接到 Chirp", "Connect to Chirp");
-        LoginIntro.Text = confirmed ? T("服务器已连接。请选择登录方式。", "Connected to your server. Choose how to sign in.")
+        var locked = loginLock.Locked;
+        LoginHeading.Text = locked ? T("Chirp 已锁定", "Chirp is locked") :
+            confirmed ? T("登录 Chirp", "Sign in to Chirp") : T("连接到 Chirp", "Connect to Chirp");
+        LoginIntro.Text = locked ? T("通过 Windows Hello 验证身份，继续上次登录。", "Use Windows Hello to resume your sign-in.") :
+            confirmed ? T("服务器已连接。请选择登录方式。", "Connected to your server. Choose how to sign in.")
             : T("输入你的 Chirp 服务器地址，即可开始登录。", "Enter your Chirp server address to get started.");
-        ConnectButton.Visibility = Visible(!confirmed);
-        AuthActions.Visibility = Visible(confirmed);
+        Address.Visibility = LocalOptions.Visibility = Visible(loginInitialized && !locked);
+        UnlockActions.Visibility = Visible(locked);
+        ConnectButton.Visibility = Visible(loginInitialized && !locked && !confirmed);
+        AuthActions.Visibility = Visible(loginInitialized && !locked && confirmed);
+        if (!loginInitialized && !locked)
+        {
+            LoginHeading.Text = T("正在打开 Chirp", "Opening Chirp");
+            LoginIntro.Text = "";
+        }
         Phone.Visibility = Visible(connection.Bool("phone"));
         Register.Visibility = Visible(connection.Bool("registration"));
     }
@@ -298,6 +317,7 @@ public sealed partial class MainPage : Page
               "This removes all Chirp device keys, pending recovery exports, local trust records, attachment cache, logs and preferences on this PC. You will need another authorized device or your saved recovery file to sign in again. Your server account and exported files are kept."),
             T("清空本地数据", "Clear local data"))) return;
         await Rpc("clearLocalData");
+        DeleteHelloKey();
         ApplyLogState(await Rpc("logState"));
         settings.Values.Clear(); SignedOut();
         foreach (var page in App.Pages) { page.SetAddressText(""); page.ApplyLanguage(1); page.ApplyTheme(); }
@@ -382,7 +402,8 @@ public sealed partial class MainPage : Page
         await OpenLoginBrowser("openRegistration", c.Str("url"));
         Show(() => L("请在浏览器完成注册，管理员批准后返回登录。"));
     }, true);
-    private async void PasskeyClick(object sender, RoutedEventArgs e) => await Run(async () =>
+    private async void PasskeyClick(object sender, RoutedEventArgs e) => await Run(OpenPasskey, true, requiresClock: true);
+    private async Task OpenPasskey()
     {
         LoginWindow = Owner;
         var generation = authGeneration;
@@ -391,13 +412,13 @@ public sealed partial class MainPage : Page
         RequireNetworkClock();
         await OpenLoginBrowser("openBrowser", r.Str("url"));
         Show(() => T("请在系统浏览器中使用通行密钥登录。", "Finish signing in with your passkey in the browser."));
-    }, true, requiresClock: true);
+    }
     internal void HandleCallback(string uri)
     {
         if (!loaded || !loginInitialized || busy || networkClock.Read().Status == ClockStatus.Checking) { pendingCallback = uri; return; }
         pendingCallback = "";
-        if (connection is null || member is not null) return;
-        _ = Run(async () => await AfterLogin(await Rpc("exchange", new { url = uri })), true, requiresClock: true);
+        if (connection is null || member is not null || loginLock.Locked) return;
+        _ = Run(async () => await AfterLogin(await CompletePasskey("exchange", url: uri)), true, requiresClock: true);
     }
     private async void PhoneClick(object sender, RoutedEventArgs e) => await Run(async () =>
     {
@@ -462,7 +483,7 @@ public sealed partial class MainPage : Page
                 finally { timer.Stop(); box.Hide(); }
                 if (claimed && generation == authGeneration && !closed)
                 {
-                    await AfterLogin(await Rpc("finishPhone", new { id }));
+                    await AfterLogin(await CompletePasskey("finishPhone", id: id));
                     return;
                 }
             }
@@ -484,6 +505,15 @@ public sealed partial class MainPage : Page
             if (id.Length != 0 && result.Str("step") != "signedIn") await Rpc("cancelLogin", new { id });
         }
         if (result.Str("step") != "signedIn") return;
+        onlineExpires = result.Num("expires");
+        if (onlineExpires <= NowSeconds)
+        {
+            protocol?.Notify("checkLogin", new { });
+            throw new IOException("CLIENT_LOGIN_EXPIRED");
+        }
+        SetLoginDeadline(onlineExpires);
+        onlineLogin = result.Str("login");
+        resumption = result.Str("resumption");
         member = result?["member"]; canEnroll = result.Bool("canEnroll"); lastDirectory = ""; directoryStale = false;
         foreach (var page in App.Pages) page.ShowWorkspace();
         await SyncForeground();
@@ -698,11 +728,13 @@ public sealed partial class MainPage : Page
     }
     private void UpdateLoginBusy()
     {
-        Address.IsEnabled = ConnectButton.IsEnabled = Register.IsEnabled = LocalOptions.IsEnabled = !busy;
+        Address.IsEnabled = ConnectButton.IsEnabled = Register.IsEnabled = LocalOptions.IsEnabled = loginInitialized && !busy;
         var ready = ClockReady;
-        Passkey.IsEnabled = Phone.IsEnabled = ApproveSaved.IsEnabled = !busy && ready;
+        Passkey.IsEnabled = Phone.IsEnabled = ApproveSaved.IsEnabled = loginInitialized && !busy && ready;
+        UnlockButton.IsEnabled = ready && !busy && !helloOpen && loginLock.Attempt is null;
+        UsePasskey.IsEnabled = !busy;
         if (approveDeviceButton is not null) approveDeviceButton.IsEnabled = canEnroll && ready;
-        Working.Visibility = Visible(busy);
+        Working.Visibility = Visible(!loginInitialized || busy || loginLock.Attempt is not null);
     }
 
     private void Show(Func<string> text, InfoBarSeverity severity = InfoBarSeverity.Informational, InfoBar? target = null)
@@ -735,6 +767,9 @@ public sealed partial class MainPage : Page
     }
     private string ErrorText(string code) => code switch
     {
+        "HELLO_KEY_UNAVAILABLE" => T("Windows Hello 无法解锁这次登录。请重试，或使用通行密钥重新登录。", "Windows Hello could not unlock this sign-in. Try again or sign in with a passkey."),
+        "RESUMPTION_PROOF_INVALID" => T("解锁请求已失效，请再次解锁。", "The unlock challenge expired. Unlock again to retry."),
+        "LOGIN_STORAGE_UNAVAILABLE" => T("无法访问保存的登录。请检查本机存储，然后重试。", "Could not access the saved sign-in. Check local storage and try again."),
         "INVALID_RESPONSE" when member is null && connection is null => T("请检查服务器地址，确认它指向你的 Chirp 服务。", "Check that the server address points to your Chirp service."),
         "INVALID_SERVER_ADDRESS" => T("请输入有效的 Chirp 服务器地址，例如 chirp.example.com。", "Enter a valid Chirp server address, such as chirp.example.com."),
         "SERVER_UNAVAILABLE" => T("无法连接服务器，请检查地址和网络后重试。", "Could not reach the server. Check the address and your connection."),

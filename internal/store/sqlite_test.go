@@ -64,7 +64,7 @@ func TestConcurrentInitializationAndRestart(t *testing.T) {
 			}
 			defer s.Close()
 			var count int
-			if err := s.db.QueryRow("SELECT COUNT(*) FROM sqlite_schema WHERE type = 'table' AND name NOT LIKE 'sqlite_%'").Scan(&count); err != nil || count != 25 {
+			if err := s.db.QueryRow("SELECT COUNT(*) FROM sqlite_schema WHERE type = 'table' AND name NOT LIKE 'sqlite_%'").Scan(&count); err != nil || count != 26 {
 				t.Errorf("incomplete schema: tables=%d, error=%v", count, err)
 			}
 		})

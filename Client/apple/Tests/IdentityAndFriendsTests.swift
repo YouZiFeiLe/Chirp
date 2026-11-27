@@ -43,8 +43,11 @@ private final class SetupURLProtocol: URLProtocol, @unchecked Sendable {
                     V5Crypto.hash(Data((body["setup_token"] as! String).utf8)), V5Crypto.hash(Data((body["code_verifier"] as! String).utf8)), challenge, device.accountKey, device.digest])
                 try V5Crypto.verify(key: device.leafKey, signature: body["signature"] as! String, message: message)
                 if Self.state.withLock({ $0.failCompletions }) { throw URLError(.networkConnectionLost) }
+                #expect(request.value(forHTTPHeaderField: "X-Chirp-Login-Resumption") == "1")
+                let activated = Int(Date().timeIntervalSince1970)
                 response = ["member": ["id": "member_setup", "display_name": "Setup"], "credential": "chirp_" + String(repeating: "x", count: 43),
-                    "expires_at": Date().timeIntervalSince1970 + 3600, "participant_identity": "member_setup.login_test", "device_identity": body["device"]!]
+                    "expires_at": activated + 20 * 3600, "participant_identity": "member_setup.login_test", "device_identity": body["device"]!,
+                    "resume_token": "resume-v1_" + String(repeating: "r", count: 43)]
             }
             client?.urlProtocol(self, didReceive: HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: ["Content-Type": "application/json"])!, cacheStoragePolicy: .notAllowed)
             client?.urlProtocol(self, didLoad: try JSONSerialization.data(withJSONObject: response)); client?.urlProtocolDidFinishLoading(self)
@@ -120,7 +123,7 @@ private final class SetupURLProtocol: URLProtocol, @unchecked Sendable {
         }, query: { [sample] })
         let setup = controller(identity, storage: storage, requireClock: clock.requireReady)
         var accepted: ClientSession?
-        setup.onComplete = { accepted = $0 }
+        setup.onComplete = { value, _ in accepted = value }
         let verifier = String(repeating: "v", count: 43)
         await #expect(throws: ClientFailure(.networkTimeRequired)) {
             try await setup.begin(login, connection: testServerConnection, verifier: verifier)
@@ -139,7 +142,8 @@ private final class SetupURLProtocol: URLProtocol, @unchecked Sendable {
         let persistence = MemoryIdentityPersistence(); let identity = DeviceIdentityStore(persistence: persistence)
         let storage = try temporaryStorage(); defer { try? storage.clear() }
         let setup = controller(identity, storage: storage)
-        var login: ClientSession?; setup.onComplete = { login = $0 }
+        var login: ClientSession?, saved: SavedLogin?
+        setup.onComplete = { value, grant in login = value; saved = grant }
         try await setup.begin(authentication(), connection: testServerConnection, verifier: String(repeating: "v", count: 43))
         #expect(setup.step == .password && identity.isEnrolled && !identity.isBound)
         #expect(SetupURLProtocol.state.withLock { $0.completions } == 0)
@@ -157,6 +161,8 @@ private final class SetupURLProtocol: URLProtocol, @unchecked Sendable {
         setup.clock.setVisible(false, now: .now.advanced(by: .seconds(5)))
         await setup.confirmBackup()
         #expect(login?.member.id == "member_setup" && identity.isBound && setup.pending == nil)
+        let grant = try #require(saved)
+        #expect(grant.expiresAt == login?.expiresAt)
         #expect(try storage.load(record.origin + "|" + record.accountID) == nil)
         #expect(SetupURLProtocol.state.withLock { $0.completions } == 1)
     }

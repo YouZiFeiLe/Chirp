@@ -21,6 +21,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import cn.youzifeile.chirp.ui.ChirpApp
 import cn.youzifeile.chirp.ui.ChirpTheme
+import cn.youzifeile.chirp.ui.authenticateLogin
 import cn.youzifeile.chirp.ui.MainViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -30,10 +31,32 @@ class MainActivity : ComponentActivity() {
     private var callback by mutableStateOf<String?>(null)
     internal lateinit var model: MainViewModel
         private set
+    private lateinit var taskPreview: TaskPreview
 
     override fun onStart() {
         super.onStart()
         (application as ChirpApplication).logs.foreground()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        model.enterForeground(hasWindowFocus()) { cipher -> authenticateLogin(this, cipher) }
+        taskPreview.update()
+    }
+
+    override fun onPause() {
+        model.leaveForeground()
+        super.onPause()
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        taskPreview.update()
+    }
+
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        model.cancelUnlock()
     }
 
     override fun onStop() {
@@ -42,6 +65,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        taskPreview.close()
         super.onDestroy()
         if (isFinishing) (application as ChirpApplication).finishRemovedTask()
     }
@@ -63,7 +87,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        setRecentsScreenshotEnabled(false)
         model = (application as ChirpApplication).modelForTask(taskId)
+        taskPreview = TaskPreview(window.decorView, model::windowFocusChanged)
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.RESUMED) {
                 while (isActive) {

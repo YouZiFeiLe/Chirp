@@ -53,6 +53,12 @@
                   <Button x:Name="Phone" HorizontalAlignment="Stretch" Style="{StaticResource ChirpButton}" Click="PhoneClick"/>
                   <HyperlinkButton x:Name="Register" Click="RegisterClick"/>
                 </StackPanel>
+                <StackPanel x:Name="UnlockActions" Spacing="8" Visibility="Collapsed">
+                  <Button x:Name="UnlockButton" AutomationProperties.AutomationId="UnlockLogin" HorizontalAlignment="Stretch"
+                          Style="{StaticResource ChirpPrimary}" Click="UnlockClick"/>
+                  <Button x:Name="UsePasskey" AutomationProperties.AutomationId="ReplaceSavedLogin" HorizontalAlignment="Stretch"
+                          Style="{StaticResource ChirpButton}" Click="UsePasskeyClick"/>
+                </StackPanel>
                 <ProgressBar x:Name="Working" IsIndeterminate="True" Visibility="Collapsed"/>
                 <InfoBar x:Name="LoginNotice" IsOpen="False" IsClosable="True"/>
               </StackPanel>

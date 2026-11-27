@@ -754,6 +754,11 @@ public sealed partial class MainPage
     }
     private void SignedOut(bool restore = true, string? reason = null)
     {
+        InterruptUnlock();
+        loginLock.Clear();
+        onlineExpires = 0;
+        onlineLogin = resumption = "";
+        SetLoginDeadline(0);
         LogUI("login");
         directoryActive = false; directoryWatch = ""; directoryVisibility++;
         profiles.Reset();

@@ -94,6 +94,12 @@ func (e *engine) acceptChat(delivery chatDelivery, send func(string, any)) {
 }
 func (e *engine) enqueueCommand(ctx context.Context, commands *actorMailbox[command], c command) {
 	switch c.Op {
+	case "resumeLogin":
+		c.resume = e.beginResume(ctx, c.Args.ID)
+	case "cancelResume":
+		e.stopResume(c.Args.ID)
+	case "logout", "clearLocalData":
+		e.stopResume("")
 	case "join":
 		c.join = e.joins.begin(ctx, c.Args.Key)
 	case "cancelJoin":

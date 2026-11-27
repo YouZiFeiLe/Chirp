@@ -34,6 +34,19 @@ func TestLocalWinUIDesktop(t *testing.T) {
 	} else {
 		f = service(t, rtc)
 	}
+	// Observe the real shell browser handoff without invoking a real passkey or
+	// writing the authorization state, code challenge, or URL to the test log.
+	f.mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("code_challenge_method") != "S256" {
+			http.NotFound(w, r)
+			return
+		}
+		if err := os.WriteFile(filepath.Join(dir, "browser-opened.txt"), []byte(time.Now().UTC().Format(time.RFC3339Nano)), 0600); err != nil {
+			t.Error(err)
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		fmt.Fprint(w, "<!doctype html><title>Chirp 登录网页测试</title><p>已收到测试登录请求。可以关闭这个标签页。</p>")
+	})
 	target, _ := f.mux.Handler(httptest.NewRequest("POST", "/v1/rooms/test/preflight", nil))
 	f.mux.HandleFunc("POST /v1/rooms/{room}/preflight", func(w http.ResponseWriter, r *http.Request) {
 		if _, err := os.Stat(filepath.Join(dir, "hold-preflight")); err == nil {
