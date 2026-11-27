@@ -4,4 +4,6 @@
     <color name="chirp_accent_light">#246448</color>
     <color name="chirp_accent_dark">#A9DAB5</color>
     <color name="launcher_green">#38644F</color>
+    <color name="unlock_emblem_ink">@color/chirp_accent_light</color>
+    <color name="unlock_emblem_paper">@color/chirp_canvas_light</color>
 </resources>

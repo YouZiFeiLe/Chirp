@@ -61,31 +61,39 @@ struct ClientLoginRequest: Sendable {
 }
 
 struct ClientSession: Sendable {
+    // Allow one minute of clock skew when validating a server timestamp.
+    static let maximumReportedLifetime: TimeInterval = 20 * 60 * 60 + 60
     let connection: ServerConnection
     let member: MemberInfo
     let credential: String
     let expiresAt: Date
     let participantIdentity: String
     let deviceIdentity: V5Device?
-    private struct Response: Decodable {
+    struct Response: Decodable {
         let member: MemberInfo
         let credential: String
         let expiresAt: Double
         let participantIdentity: String
         let deviceIdentity: V5Device?
+        let resumeToken: String?
         enum CodingKeys: String, CodingKey {
             case member, credential
             case expiresAt = "expires_at", participantIdentity = "participant_identity"
             case deviceIdentity = "device_identity"
+            case resumeToken = "resume_token"
         }
     }
 
     init(data: Data, connection: ServerConnection, expectedDevice: V5Device? = nil) throws {
-        let response = try JSONDecoder().decode(Response.self, from: data)
+        try self.init(response: JSONDecoder().decode(Response.self, from: data), connection: connection, expectedDevice: expectedDevice)
+    }
+
+    init(response: Response, connection: ServerConnection, expectedDevice: V5Device? = nil, sessionDeadline: Date? = nil) throws {
         self.connection = connection
         member = response.member
         credential = response.credential
-        expiresAt = Date(timeIntervalSince1970: response.expiresAt)
+        let serverExpiry = Date(timeIntervalSince1970: response.expiresAt)
+        expiresAt = min(serverExpiry, sessionDeadline ?? serverExpiry)
         participantIdentity = response.participantIdentity
         deviceIdentity = response.deviceIdentity
         if let expectedDevice {
@@ -94,7 +102,7 @@ struct ClientSession: Sendable {
         }
         guard credential.hasPrefix("chirp_"), credential.count == 49,
               participantIdentity.hasPrefix(member.id + ".login_"),
-              expiresAt > Date(), expiresAt.timeIntervalSinceNow <= 20 * 60 * 60 + 60 else {
+              expiresAt > Date(), serverExpiry.timeIntervalSinceNow <= Self.maximumReportedLifetime else {
             throw ClientFailure(.invalidLoginSession)
         }
     }

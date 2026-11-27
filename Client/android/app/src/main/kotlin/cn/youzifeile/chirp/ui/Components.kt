@@ -192,7 +192,8 @@ internal fun compactWindowHeight(): Boolean = !currentWindowAdaptiveInfoV2().win
 @Composable
 internal fun SettingRow(@DrawableRes icon: Int, title: String, supporting: String? = null,
     onClick: (() -> Unit)? = null, enabled: Boolean = true, expanded: Boolean? = null,
-    destructive: Boolean = false, supportingColor: Color = MaterialTheme.colorScheme.onSurfaceVariant) {
+    destructive: Boolean = false, supportingColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    onClickLabel: String? = null) {
     val colors = MaterialTheme.colorScheme
     val disabledInk = colors.onSurface.copy(alpha = .38f)
     val titleColor = if (destructive) colors.error else colors.onSurface
@@ -200,7 +201,8 @@ internal fun SettingRow(@DrawableRes icon: Int, title: String, supporting: Strin
     val expansionState = expanded?.let {
         stringResource(if (it) R.string.settings_expanded else R.string.settings_collapsed)
     }
-    val row = if (onClick == null) Modifier else Modifier.clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+    val row = if (onClick == null) Modifier else Modifier.clickable(
+        enabled = enabled, role = Role.Button, onClickLabel = onClickLabel, onClick = onClick)
     ListItem(
         headlineContent = { Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) },
         supportingContent = supporting?.let { { Text(it, Modifier.padding(top = 2.dp), style = MaterialTheme.typography.bodyMedium) } },
@@ -322,6 +324,7 @@ private fun errorLabel(code: String): Int? = when (code) {
     "DEVICE_PAIRING_CANCELLED" -> R.string.pair_cancelled_detail
     "PAIR_CODE_MISMATCH" -> R.string.pair_wrong_digits
     "PAIR_UNLOCK_REQUIRED" -> R.string.pair_unlock_required
+    "LOGIN_BIOMETRICS_CHANGED" -> R.string.login_biometrics_changed
     "INVALID_SERVER_ADDRESS" -> R.string.error_address
     "INVALID_RESPONSE" -> R.string.error_response
     "CLIENT_UPDATE_REQUIRED" -> R.string.error_upgrade

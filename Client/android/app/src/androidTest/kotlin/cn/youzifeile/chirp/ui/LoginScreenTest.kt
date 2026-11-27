@@ -5,12 +5,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.height
 import androidx.compose.ui.unit.width
 import cn.youzifeile.chirp.R
+import cn.youzifeile.chirp.data.ClientFailure
 import cn.youzifeile.chirp.data.ClockReading
 import cn.youzifeile.chirp.data.ClockStatus
 import cn.youzifeile.chirp.data.ServerConnection
@@ -24,6 +26,33 @@ import java.io.File
 
 class LoginScreenTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
+
+    @Test fun lockedWelcomeKeepsUnlockProgressRetryAndPasskeyAccessible() {
+        var state by mutableStateOf(MainState(clock = ClockReading(ClockStatus.Ready)))
+        var passkeys = 0
+        var clockRetries = 0
+        compose.setContent {
+            ChirpTheme {
+                LockedLoginScreen(state, unlock = { state = state.copy(unlocking = true) },
+                    passkey = { passkeys++ }, retryClock = { clockRetries++ })
+            }
+        }
+        fun label(id: Int) = compose.activity.getString(id)
+        val heading = compose.onNode(hasText(label(R.string.welcome_back)) and SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading))
+        val primary = compose.onNode(hasClickAction() and SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion))
+        val passkey = compose.onNodeWithText(label(R.string.unlock_with_passkey))
+        heading.performScrollTo().assertIsDisplayed()
+        primary.performScrollTo().assertHeightIsAtLeast(56.dp).performClick()
+        primary.assertIsNotEnabled().assertTextContains(label(R.string.unlocking_login))
+        passkey.performScrollTo().assertIsEnabled().assertHeightIsAtLeast(48.dp)
+
+        compose.runOnIdle { state = state.copy(unlocking = false, error = ClientFailure("CLIENT_LOCAL_UNLOCK_FAILED"),
+            clock = ClockReading(ClockStatus.Unavailable, canRetry = true)) }
+        compose.onNodeWithText(label(R.string.clock_retry)).performScrollTo().performClick()
+        primary.performScrollTo().assertIsEnabled()
+        passkey.performScrollTo().performClick()
+        compose.runOnIdle { assertEquals(1, clockRetries); assertEquals(1, passkeys) }
+    }
 
     @Test fun serverFieldShowsAnExampleAndKeepsTheEnteredAddressAfterConfirmation() {
         val entered = "chirp.example.com:8443/"

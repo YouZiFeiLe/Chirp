@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"gitlab.youzifeile.cn/chirp/chirp-go/internal/httpapi"
+	"gitlab.youzifeile.cn/chirp/chirp-go/internal/identity"
 	"gitlab.youzifeile.cn/chirp/chirp-go/internal/room"
 	"gitlab.youzifeile.cn/chirp/chirp-go/internal/store"
 	"gitlab.youzifeile.cn/chirp/chirp-go/internal/testclient"
@@ -23,6 +24,7 @@ import (
 func (media) EnsureRoom(context.Context, string) error { return nil }
 
 func TestNativePasskeyExchangeAndSingleLogin(t *testing.T) {
+	t.Run("ios", func(t *testing.T) { testNativeExchange(t, "ios", "windows") })
 	t.Run("android", func(t *testing.T) { testNativeExchange(t, "android", "windows") })
 	t.Run("macos", func(t *testing.T) { testNativeExchange(t, "macos", "windows") })
 	t.Run("windows", func(t *testing.T) { testNativeExchange(t, "windows", "macos") })
@@ -31,6 +33,7 @@ func TestNativePasskeyExchangeAndSingleLogin(t *testing.T) {
 type nativeTestTarget struct {
 	client                store.ClientIdentity
 	clientID, redirectURI string
+	requestResumption     bool
 }
 
 func (f *fixture) nativeTarget(t *testing.T, platform string) nativeTestTarget {
@@ -38,11 +41,11 @@ func (f *fixture) nativeTarget(t *testing.T, platform string) nativeTestTarget {
 	client := testclient.MustLatest(t, f.db, platform)
 	switch platform {
 	case store.WindowsClientPlatform:
-		return nativeTestTarget{client, store.WindowsClientID, store.WindowsClientRedirectURI}
+		return nativeTestTarget{client, store.WindowsClientID, store.WindowsClientRedirectURI, false}
 	case store.AndroidClientPlatform:
-		return nativeTestTarget{client, store.AndroidClientID, store.AndroidClientRedirectURI}
+		return nativeTestTarget{client, store.AndroidClientID, store.AndroidClientRedirectURI, false}
 	default:
-		return nativeTestTarget{client, store.ClientID, store.ClientRedirectURI}
+		return nativeTestTarget{client, store.ClientID, store.ClientRedirectURI, false}
 	}
 }
 
@@ -117,8 +120,11 @@ func testNativeExchange(t *testing.T, platform, otherPlatform string) {
 	exchange(firstCode, verifier, mismatched, 400)
 	checkHandoff(firstCode, false)
 	f.restart(t)
-	one := decodeJSON[store.ClientLogin](t, exchange(firstCode, verifier, target, 200))
-	if one.Credential == "" || one.Member.LastLoginAt == "" || one.ExpiresAt > time.Now().Add(20*time.Hour).Unix() {
+	target.requestResumption = true
+	firstResponse := exchange(firstCode, verifier, target, 200)
+	one := decodeJSON[store.ClientLogin](t, firstResponse)
+	activated, err := time.Parse(time.RFC3339, one.Member.LastLoginAt)
+	if err != nil || one.Credential == "" || one.ExpiresAt != activated.Add(20*time.Hour).Unix() {
 		t.Fatal("missing native credential metadata")
 	}
 	exchange(firstCode, verifier, target, 400)
@@ -135,6 +141,31 @@ func testNativeExchange(t *testing.T, platform, otherPlatform string) {
 	// Rebuild the handler after a database restart.
 	api = httpapi.New(f.db, media{}, room.Issuer{}, "wss://rtc.test.local", "https://keys.example.test", slog.New(slog.NewTextHandler(io.Discard, nil)))
 	requestAPI(one.Credential, "GET", "/v1/session", 200)
+	original := one
+	if !strings.HasPrefix(one.ResumeToken, identity.ResumptionTokenPrefix) {
+		t.Fatal("missing platform-neutral login grant")
+	}
+	requestAPI(one.ResumeToken, "GET", "/v1/session", 401)
+	body := map[string]string{"resume_token": one.ResumeToken}
+	challenge := decodeJSON[map[string]string](t, f.nativePOST(t, "resume/challenge", body, target, 200))["challenge"]
+	participant := decodeJSON[struct {
+		Participant string `json:"participant_identity"`
+	}](t, firstResponse).Participant
+	origin, err := identity.NormalizeOrigin(testOrigin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.nativePOST(t, "resume/complete", body, target, 409)
+	body["signature"] = identity.Sign(testidentity.New("existing-login-fixture").Key,
+		identity.ResumptionMessage(origin, platform, participant, one.ResumeToken, challenge, one.Device))
+	one = decodeJSON[store.ClientLogin](t, f.nativePOST(t, "resume/complete", body, target, 200))
+	f.nativePOST(t, "resume/complete", body, target, 409)
+	requestAPI(original.Credential, "GET", "/v1/session", 401)
+	requestAPI(one.Credential, "GET", "/v1/session", 200)
+	if original.ExpiresAt != one.ExpiresAt {
+		t.Fatal("resume extended the deadline")
+	}
+	target.requestResumption = false
 	secondCode := code(200)
 	checkHandoff(secondCode, false)
 	f.request(t, f.http, "POST", "/api/auth/login/windows-handoff", map[string]string{"code": firstCode}, 400)
@@ -143,6 +174,9 @@ func testNativeExchange(t *testing.T, platform, otherPlatform string) {
 	exchange(secondCode, verifier, oldVersion, 403)
 	requestAPI(one.Credential, "GET", "/v1/session", 200)
 	two := decodeJSON[store.ClientLogin](t, exchange(secondCode, verifier, target, 200))
+	if two.ResumeToken != "" {
+		t.Fatal("a client without the capability received a grant")
+	}
 	requestAPI(one.Credential, "GET", "/v1/me", 401)
 	requestAPI(two.Credential, "GET", "/v1/me", 200)
 	requestAPI(two.Credential, "POST", "/v1/logout", 204)

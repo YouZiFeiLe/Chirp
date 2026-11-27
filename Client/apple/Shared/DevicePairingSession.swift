@@ -310,9 +310,7 @@ final class DevicePairingSession: Identifiable {
     private static func authenticateLocal() async throws {
         let context = LAContext()
         let reason: LocalizedMessage = "批准新设备访问此账号。请仅授权您本人持有的设备。"
-        guard try await context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: reason.localized(in: AppLanguage.load().locale)) else {
-            throw LAError(.authenticationFailed)
-        }
+        try await LocalAuthenticationPrompt.verify(.deviceOwnerAuthentication, using: context, reason: reason.localized(in: AppLanguage.load().locale))
     }
 
     #if DEBUG

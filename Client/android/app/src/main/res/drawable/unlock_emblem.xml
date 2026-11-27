@@ -1,0 +1,24 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="192dp" android:height="192dp"
+    android:viewportWidth="192" android:viewportHeight="192">
+    <!-- The outer echoes frame Chirp's six-bar voice mark. -->
+    <path android:fillColor="@color/unlock_emblem_ink" android:fillAlpha=".045"
+        android:pathData="M96,6a90,90 0,1 1,0 180a90,90 0,1 1,0 -180z" />
+    <path android:strokeColor="@color/unlock_emblem_ink" android:strokeAlpha=".16" android:strokeWidth="1"
+        android:pathData="M96,8a88,88 0,1 1,0 176a88,88 0,1 1,0 -176z M96,25a71,71 0,1 1,0 142a71,71 0,1 1,0 -142z" />
+    <path android:strokeColor="@color/unlock_emblem_ink" android:strokeAlpha=".36" android:strokeWidth="1.5" android:strokeLineCap="round"
+        android:pathData="M30,38a88,88 0,0 1,47 -28 M119,29a71,71 0,0 1,40 34 M38,137a71,71 0,0 1,-11 -24" />
+    <path android:fillColor="@color/unlock_emblem_ink" android:fillAlpha=".075"
+        android:pathData="M96,42a54,54 0,1 1,0 108a54,54 0,1 1,0 -108z" />
+    <path android:fillColor="@color/unlock_emblem_ink"
+        android:pathData="M96,55a41,41 0,1 1,0 82a41,41 0,1 1,0 -82z" />
+    <path android:strokeColor="@color/unlock_emblem_paper" android:strokeWidth="4.4" android:strokeLineCap="round"
+        android:pathData="M74,91v10 M83,85v22 M92,75v42 M101,87v18 M110,80v32 M119,90v12" />
+    <path android:fillColor="@color/unlock_emblem_paper" android:strokeColor="@color/unlock_emblem_ink"
+        android:strokeAlpha=".36" android:strokeWidth="1.25"
+        android:pathData="M149,127a20,20 0,1 1,0 40a20,20 0,1 1,0 -40z" />
+    <path android:strokeColor="@color/unlock_emblem_ink" android:strokeWidth="2" android:strokeLineCap="round"
+        android:pathData="M144.5,145v-3a4.5,4.5 0,0 1,9 0v3" />
+    <path android:fillColor="@color/unlock_emblem_ink" android:fillType="evenOdd"
+        android:pathData="M143,144h12a2,2 0,0 1,2 2v7a2,2 0,0 1,-2 2h-12a2,2 0,0 1,-2 -2v-7a2,2 0,0 1,2 -2z M148,148h2v4h-2z" />
+</vector>

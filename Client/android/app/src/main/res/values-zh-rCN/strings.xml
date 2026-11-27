@@ -1,4 +1,8 @@
 <resources>
+    <string name="unlock_prompt_detail">验证身份后即可恢复上次登录。</string>
+    <string name="unlock_with_fingerprint">使用指纹解锁</string>
+    <string name="unlock_with_biometrics">使用生物识别解锁</string>
+    <string name="login_biometrics_changed">本机生物识别登记已变更，请使用通行密钥重新登录。</string>
     <string name="app_name">Chirp</string>
     <string name="clock_checking">正在校验本机时间，校验通过后即可登录或授权设备。</string>
     <string name="clock_ahead">本机时间比网络时间快约 %1$.1f 秒。请在系统设置中开启自动设置时间，校准后即可登录或授权设备。</string>
@@ -15,6 +19,7 @@
     <string name="register">注册</string>
     <string name="new_version">Chirp %1$s 已可用。</string>
     <string name="version_with_build">%1$s（构建 %2$d）</string>
+    <string name="project_link_browser_error">无法打开项目地址，请检查默认浏览器设置。</string>
     <string name="room_loading">正在同步房间…</string>
     <string name="room_select">选择一个房间</string>
     <string name="room_select_detail">打开房间，看看谁在，随时加入。</string>

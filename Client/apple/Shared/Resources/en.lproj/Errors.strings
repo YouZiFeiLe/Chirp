@@ -19,6 +19,8 @@
 "CLIENT_INVALID_LOGIN_CALLBACK" = "The sign-in callback is invalid. Please try again.";
 "CLIENT_LOGIN_VERIFICATION_FAILED" = "Sign-in verification failed or expired. Please sign in again.";
 "CLIENT_SECURE_LOGIN_FAILED" = "A secure sign-in request could not be created.";
+"CLIENT_LOCAL_UNLOCK_FAILED" = "Device verification failed. Try again or sign in with your passkey.";
+"RESUMPTION_PROOF_INVALID" = "This unlock request could not be verified. Try again.";
 "CLIENT_INVALID_LOGIN_SESSION" = "The server returned invalid sign-in information.";
 "CLIENT_LOGIN_INCOMPLETE" = "Sign-in did not complete or has expired. Please sign in again.";
 "CLIENT_LOGIN_EXPIRED" = "Your session has expired. Please sign in again with your passkey.";

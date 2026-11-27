@@ -24,7 +24,7 @@ import (
 	"gitlab.youzifeile.cn/chirp/chirp-go/internal/store"
 )
 
-const version = "2026.11.24"
+const version = "2026.11.27"
 const build = 1
 
 type obj = map[string]any
@@ -164,6 +164,7 @@ type connection struct {
 	endpoints           config.ClientEndpoints
 	defaultRoom         string
 	registration, phone bool
+	verifiedAt          time.Time
 }
 
 // The last confirmed discovery is stored inside the user's DPAPI vault.
@@ -204,7 +205,8 @@ func (e *engine) restoreConnection() (obj, error) {
 			return nil, invalid
 		}
 	}
-	e.conn = &connection{s.Discovery, s.Origin, s.Endpoints, s.DefaultRoom, s.Registration, s.Phone}
+	e.conn = &connection{discovery: s.Discovery, origin: s.Origin, endpoints: s.Endpoints,
+		defaultRoom: s.DefaultRoom, registration: s.Registration, phone: s.Phone}
 	return e.connectionView(), nil
 }
 func (e *engine) connectionView() obj {
@@ -356,6 +358,7 @@ func detect(ctx context.Context, raw string, local bool) (*connection, error) {
 	if status != http.StatusOK || health.Service != "chirp" || health.Status != "ok" {
 		return nil, invalid
 	}
+	c.verifiedAt = time.Now()
 	return c, nil
 }
 func (c *connection) api(path string) string {

@@ -75,8 +75,11 @@ public sealed partial class MainPage
     {
         var icon = Glyph(glyph, 19);
         icon.Style = Design("ChirpBrandIcon");
-        return new Border { Style = Design("ChirpInset"), Width = 38, Height = 38, Child = icon };
+        return IconTile(icon);
     }
+
+    private static Border IconTile(UIElement icon) =>
+        new() { Style = Design("ChirpInset"), Width = 38, Height = 38, Child = icon };
 
     private static void Label(FrameworkElement element, string label)
     {

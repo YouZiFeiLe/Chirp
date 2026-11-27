@@ -2,6 +2,8 @@ import SwiftUI
 
 /// The account overview is shared; each platform owns its native navigation.
 struct ClientSettingsView: View {
+    private static let repositoryURL = URL(string: "https://github.com/YouZiFeiLe/Chirp")!
+
     @Environment(ApplicationSession.self) private var application
     @ObservedObject var call: CallController
     let memberID: String
@@ -13,6 +15,7 @@ struct ClientSettingsView: View {
     let showIdentitySettings: ((IdentitySettingsPage) -> Void)?
     let showAudioSettings: () -> Void
     @ScaledMetric(relativeTo: .body) private var avatarSize = 60
+    @ScaledMetric(relativeTo: .body) private var repositoryMarkSize = 20
 
     var body: some View {
         Form {
@@ -78,6 +81,23 @@ struct ClientSettingsView: View {
                 LabeledContent {
                     Text(verbatim: appVersion).monospacedDigit().foregroundStyle(ChirpTheme.secondary)
                 } label: { MessageText("版本") }
+                Link(destination: Self.repositoryURL) {
+                    LabeledContent {
+                        HStack(spacing: 6) {
+                            Image(.gitHubMark)
+                                .resizable().scaledToFit()
+                                .frame(width: repositoryMarkSize, height: repositoryMarkSize)
+                                .foregroundStyle(Color.primary)
+                                .accessibilityHidden(true)
+                            Text(verbatim: "Chirp")
+                                .font(.system(.body, design: .rounded, weight: .semibold))
+                                .foregroundStyle(ChirpTheme.accent)
+                        }
+                    } label: { MessageText("项目地址").foregroundStyle(Color.primary) }
+                    .contentShape(.rect)
+                }
+                .messageAccessibilityLabel("在 GitHub 上查看 Chirp")
+                .accessibilityIdentifier("project-repository-link")
             } header: { MessageText("关于 Chirp") }
             .listRowBackground(ChirpTheme.surface)
 

@@ -1,0 +1,4 @@
+<resources>
+    <color name="unlock_emblem_ink">@color/chirp_accent_dark</color>
+    <color name="unlock_emblem_paper">@color/chirp_canvas_dark</color>
+</resources>

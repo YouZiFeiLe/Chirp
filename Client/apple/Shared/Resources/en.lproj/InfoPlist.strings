@@ -3,4 +3,4 @@
 "NSLocalNetworkUsageDescription" = "Connect to your self-hosted voice server.";
 "NSPhotoLibraryAddUsageDescription" = "Save your device authorization QR code to Photos so you can import it on another device.";
 
-"NSFaceIDUsageDescription" = "Verify your identity before authorizing a new device. You can also use your device passcode.";
+"NSFaceIDUsageDescription" = "Use Face ID to unlock Chirp when you return and to verify your identity before authorizing a new device.";

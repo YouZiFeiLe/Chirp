@@ -277,7 +277,11 @@ func (e *engine) authorized(id string, d identity.Device) bool {
 }
 func (e *engine) blocked(id, root, key string) bool {
 	state := e.auth.states[root]
-	return e.account.Denied[key] || state != nil && state.Revoked[key] || slices.ContainsFunc(e.vault.Blacklists[e.conn.origin], func(b store.BlacklistEntry) bool {
+	return e.account.Denied[key] || state != nil && state.Revoked[key] || e.vault.blacklisted(e.conn.origin, id, root, key)
+}
+
+func (v *vault) blacklisted(origin, id, root, key string) bool {
+	return slices.ContainsFunc(v.Blacklists[origin], func(b store.BlacklistEntry) bool {
 		return b.Kind == "account" && (b.Subject == id || b.AccountKey == root) || b.Kind == "device" && b.Subject == key
 	})
 }

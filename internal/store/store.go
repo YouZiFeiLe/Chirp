@@ -170,6 +170,9 @@ func (s *Store) initialize(ctx context.Context) error {
 		if err := allowAndroidClientAuthorizations(ctx, tx, freshSchema); err != nil {
 			return err
 		}
+		if err := migrateLegacyLoginResumptions(ctx, tx); err != nil {
+			return err
+		}
 		return tx.Commit()
 	}
 	if !errors.Is(err, sql.ErrNoRows) {

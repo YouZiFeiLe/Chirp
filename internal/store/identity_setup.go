@@ -156,7 +156,12 @@ func (s *Store) BindIdentityChallenge(ctx context.Context, token, verifier, orig
 	return state.challenge, tx.Commit()
 }
 
-func (s *Store) CompleteIdentitySetup(ctx context.Context, token, verifier, origin, signature string, client ClientIdentity, device identity.Device, names ...string) (ClientLogin, error) {
+type IdentitySetupOptions struct {
+	DeviceName        string
+	RequestResumption bool
+}
+
+func (s *Store) CompleteIdentitySetup(ctx context.Context, token, verifier, origin, signature string, client ClientIdentity, device identity.Device, options IdentitySetupOptions) (ClientLogin, error) {
 	var result ClientLogin
 	tx, err := s.beginWrite(ctx)
 	if err != nil {
@@ -178,7 +183,7 @@ func (s *Store) CompleteIdentitySetup(ctx context.Context, token, verifier, orig
 	if root != "" && root != device.AccountKey {
 		return result, ErrIdentityConflict
 	}
-	if err = registerDevice(ctx, tx, state.memberID, device, client.Platform, names...); err != nil {
+	if err = registerDevice(ctx, tx, state.memberID, device, client.Platform, options.DeviceName); err != nil {
 		return result, err
 	}
 	data, err := json.Marshal(device)
@@ -191,6 +196,12 @@ func (s *Store) CompleteIdentitySetup(ctx context.Context, token, verifier, orig
 	result, err = issueClientLogin(ctx, tx, state.memberID)
 	if err != nil {
 		return result, err
+	}
+	if options.RequestResumption {
+		result.ResumeToken, err = issueClientResumption(ctx, tx, result.Member, state.origin, client.Platform)
+		if err != nil {
+			return ClientLogin{}, err
+		}
 	}
 	if _, err = tx.ExecContext(ctx, "UPDATE identity_setups SET completed = 1 WHERE token_hash = ?", tokenHash(token)); err != nil {
 		return result, err

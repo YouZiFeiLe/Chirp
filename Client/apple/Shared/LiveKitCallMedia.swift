@@ -615,5 +615,5 @@ extension CallController {
 }
 
 extension ApplicationSession {
-    convenience init() { self.init(dependencies: .liveKit) }
+    convenience init() { self.init(dependencies: .liveKit, loginVault: KeychainLoginVault()) }
 }

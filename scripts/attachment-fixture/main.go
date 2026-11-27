@@ -76,7 +76,7 @@ func fixtureLogin(ctx context.Context, db *store.Store, origin, name string) (st
 	setup := must(db.BeginIdentitySetup(ctx, request.RequestID, verifier, store.AndroidClientID, origin, client, true))
 	nonce := must(db.BindIdentityChallenge(ctx, setup.Token, verifier, origin, client, device.Device))
 	signature := identity.Sign(device.Key, identity.ActivationMessage(origin, setup.AccountID, store.AndroidClientID, setup.Token, verifier, nonce, device.Device))
-	login := must(db.CompleteIdentitySetup(ctx, setup.Token, verifier, origin, signature, client, device.Device))
+	login := must(db.CompleteIdentitySetup(ctx, setup.Token, verifier, origin, signature, client, device.Device, store.IdentitySetupOptions{}))
 	return login, device
 }
 

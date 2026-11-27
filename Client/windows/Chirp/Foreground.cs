@@ -11,6 +11,7 @@ public sealed partial class MainPage
     internal void WindowActivity()
     {
         if (closed || !loaded || App.Exiting) return;
+        UpdateUnlockActivity();
         if (Owner.IsForeground) _ = CheckNetworkClock();
         var foreground = App.Pages.Any(p => p.Owner.IsForeground && p.Owner.AppWindow.IsVisible);
         if (protocol is not null && foreground != loggingForeground)

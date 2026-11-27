@@ -40,3 +40,14 @@ func NormalizeOrigin(value string) (string, error) {
 func ActivationMessage(origin, accountID, clientID, token, verifier, challenge string, device Device) []byte {
 	return Message("Chirp identity activation v1", origin, accountID, clientID, Hash([]byte(token)), Hash([]byte(verifier)), challenge, device.AccountKey, device.Hash())
 }
+
+const ResumptionTokenPrefix = "resume-v1_"
+
+func ResumptionMessage(origin, platform, participant, token, challenge string, device Device) []byte {
+	domain := "Chirp login resumption v1"
+	if !strings.HasPrefix(token, ResumptionTokenPrefix) {
+		// Only previously issued handles use the pre-versioned Apple format.
+		domain = "Chirp Apple login resumption v1"
+	}
+	return Message(domain, origin, platform, participant, Hash([]byte(token)), challenge, device.Hash())
+}

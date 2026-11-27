@@ -19,6 +19,8 @@
 "CLIENT_INVALID_LOGIN_CALLBACK" = "登录回调地址不正确，请重试";
 "CLIENT_LOGIN_VERIFICATION_FAILED" = "登录校验不匹配或已失效，请重新登录";
 "CLIENT_SECURE_LOGIN_FAILED" = "无法创建安全登录请求";
+"CLIENT_LOCAL_UNLOCK_FAILED" = "未能通过本机验证。请重试或使用通行密钥重新登录。";
+"RESUMPTION_PROOF_INVALID" = "本次解锁请求未通过验证，请重试。";
 "CLIENT_INVALID_LOGIN_SESSION" = "服务器返回的登录信息无效";
 "CLIENT_LOGIN_INCOMPLETE" = "本次登录未完成或已失效，请重新认证";
 "CLIENT_LOGIN_EXPIRED" = "登录已到期，请重新使用 Passkey 认证";

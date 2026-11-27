@@ -14,17 +14,25 @@ import (
 
 func (f *fixture) identityPOST(t *testing.T, path string, body any, target nativeTestTarget, want int) *httptest.ResponseRecorder {
 	t.Helper()
+	return f.nativePOST(t, "identity/"+path, body, target, want)
+}
+
+func (f *fixture) nativePOST(t *testing.T, path string, body any, target nativeTestTarget, want int) *httptest.ResponseRecorder {
+	t.Helper()
 	data, err := json.Marshal(body)
 	if err != nil {
 		t.Fatal(err)
 	}
-	r := httptest.NewRequest("POST", testOrigin+"/api/client/identity/"+path, bytes.NewReader(data))
+	r := httptest.NewRequest("POST", testOrigin+"/api/client/"+path, bytes.NewReader(data))
 	r.Header.Set("Content-Type", "application/json")
 	testclient.SetHeaders(r, target.client)
+	if path == "identity/complete" && target.requestResumption {
+		r.Header.Set("X-Chirp-Login-Resumption", "1")
+	}
 	w := httptest.NewRecorder()
 	f.http.ServeHTTP(w, r)
 	if w.Code != want {
-		t.Fatalf("identity %s got %d want %d: %s", path, w.Code, want, w.Body.String())
+		t.Fatalf("client %s got %d want %d", path, w.Code, want)
 	}
 	return w
 }

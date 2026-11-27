@@ -33,7 +33,7 @@ func finishSetup(t *testing.T, db *Store, setup IdentitySetup, verifier string, 
 		return ClientLogin{}, err
 	}
 	signature := identity.Sign(client.Key, identity.ActivationMessage(setupTestOrigin, setup.AccountID, ClientID, setup.Token, verifier, challenge, client.Device))
-	return db.CompleteIdentitySetup(t.Context(), setup.Token, verifier, setupTestOrigin, signature, mac, client.Device)
+	return db.CompleteIdentitySetup(t.Context(), setup.Token, verifier, setupTestOrigin, signature, mac, client.Device, IdentitySetupOptions{RequestResumption: true})
 }
 func TestIdentitySetupScopeProofAndActivationOrder(t *testing.T) {
 	db := openTestStore(t)
@@ -107,7 +107,7 @@ func TestConcurrentFirstBindingHasOneWinner(t *testing.T) {
 	}{{first, va, ca, a}, {second, vb, cb, b}} {
 		wg.Go(func() {
 			sig := identity.Sign(v.client.Key, identity.ActivationMessage(setupTestOrigin, v.setup.AccountID, ClientID, v.setup.Token, v.verifier, v.challenge, v.client.Device))
-			_, err := db.CompleteIdentitySetup(context.Background(), v.setup.Token, v.verifier, setupTestOrigin, sig, mac, v.client.Device)
+			_, err := db.CompleteIdentitySetup(context.Background(), v.setup.Token, v.verifier, setupTestOrigin, sig, mac, v.client.Device, IdentitySetupOptions{})
 			results <- err
 		})
 	}
@@ -143,7 +143,7 @@ func TestSetupRequiresCandidatePossessionAndUnexpiredAuthorization(t *testing.T)
 	}
 	wrong := testidentity.New("wrong-signature")
 	sig := identity.Sign(wrong.Key, identity.ActivationMessage(setupTestOrigin, setup.AccountID, ClientID, setup.Token, verifier, challenge, candidate.Device))
-	if _, err = db.CompleteIdentitySetup(t.Context(), setup.Token, verifier, setupTestOrigin, sig, mac, candidate.Device); !errors.Is(err, ErrDeviceIdentity) {
+	if _, err = db.CompleteIdentitySetup(t.Context(), setup.Token, verifier, setupTestOrigin, sig, mac, candidate.Device, IdentitySetupOptions{}); !errors.Is(err, ErrDeviceIdentity) {
 		t.Fatal("wrong possession proof accepted", err)
 	}
 	if _, err = db.db.Exec("UPDATE identity_setups SET expires_at=0 WHERE token_hash=?", tokenHash(setup.Token)); err != nil {

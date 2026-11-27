@@ -20,6 +20,7 @@ internal enum class LogEvent(val table: LogTable) {
     loginAccepted(LogTable.account), sessionEnded(LogTable.account), logout(LogTable.account), openRegistration(LogTable.account), openBrowser(LogTable.account),
     chooseAvatar(LogTable.account), discardAvatar(LogTable.account), changeAvatar(LogTable.account), removeAvatar(LogTable.account),
     renameProfile(LogTable.account), cancelLogin(LogTable.account),
+    loginWithoutResumptionGrant(LogTable.account), saveLoginForRelaunch(LogTable.account),
 
     createIdentity(LogTable.identity), resumeSetup(LogTable.identity), restoreIdentity(LogTable.identity), verifyBackup(LogTable.identity),
     chooseRecoveryFile(LogTable.identity), exportRecoveryFile(LogTable.identity), confirmBackup(LogTable.identity), selectIdentity(LogTable.identity), findIdentity(LogTable.identity),
@@ -31,6 +32,7 @@ internal enum class LogEvent(val table: LogTable) {
     verificationMismatch(LogTable.identity), cancelVerification(LogTable.identity), syncIdentity(LogTable.identity),
 
     request(LogTable.network), clientConfig(LogTable.network), health(LogTable.network), exchangeLogin(LogTable.network),
+    resumeChallenge(LogTable.network), resumeComplete(LogTable.network),
     deviceLoginStart(LogTable.network), deviceLoginPoll(LogTable.network), deviceLoginCancel(LogTable.network),
     directoryEvents(LogTable.network), directorySnapshot(LogTable.network), validateSession(LogTable.network),
     preflight(LogTable.network), admit(LogTable.network), refreshMedia(LogTable.network), leaveRoom(LogTable.network),

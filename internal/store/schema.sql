@@ -9,6 +9,16 @@ CREATE TABLE IF NOT EXISTS registration_settings (
 ) STRICT;
 INSERT INTO registration_settings(id, closed) VALUES (1, 0) ON CONFLICT(id) DO NOTHING;
 
+CREATE TABLE IF NOT EXISTS client_login_resumptions (
+    member_id TEXT PRIMARY KEY NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+    token_hash BLOB NOT NULL UNIQUE CHECK (length(token_hash) = 32),
+    login_id TEXT NOT NULL,
+    origin TEXT NOT NULL,
+    platform TEXT NOT NULL CHECK (platform IN ('ios', 'macos', 'android', 'windows')),
+    challenge TEXT NOT NULL DEFAULT '',
+    challenge_expires_at INTEGER NOT NULL DEFAULT 0
+) STRICT;
+
 -- Fresh databases only
 
 CREATE TABLE IF NOT EXISTS members (

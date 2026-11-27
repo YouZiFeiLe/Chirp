@@ -9,6 +9,8 @@
   <ItemGroup>
     <Compile Include="../Chirp/DesktopState.cs" Link="DesktopState.cs" />
     <Compile Include="../Chirp/BackupConfirmationClock.cs" Link="BackupConfirmationClock.cs" />
+    <Compile Include="../Chirp/LoginLock.cs" Link="LoginLock.cs" />
+    <Compile Include="../Chirp/WindowsHelloLoginKey.cs" Link="WindowsHelloLoginKey.cs" />
     <Compile Include="../Chirp/NetworkClock.cs" Link="NetworkClock.cs" />
     <Compile Include="../Chirp/MemberProfiles.cs" Link="MemberProfiles.cs" />
     <Compile Include="../Chirp/ProtocolClient.cs" Link="ProtocolClient.cs" />

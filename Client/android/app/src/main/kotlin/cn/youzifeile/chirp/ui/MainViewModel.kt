@@ -11,6 +11,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import cn.youzifeile.chirp.ChirpApplication
 import cn.youzifeile.chirp.data.ClientFailure
+import cn.youzifeile.chirp.data.AuthenticateCipher
+import cn.youzifeile.chirp.data.endsSavedLogin
 import cn.youzifeile.chirp.data.ClockReading
 import cn.youzifeile.chirp.data.ClockStatus
 import cn.youzifeile.chirp.data.DevicePairing
@@ -26,6 +28,8 @@ import cn.youzifeile.chirp.data.IdentityGrant
 import cn.youzifeile.chirp.data.memberIDPattern
 import cn.youzifeile.chirp.data.parseServerAddress
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withTimeoutOrNull
 import cn.youzifeile.chirp.data.Profile
 import cn.youzifeile.chirp.data.RoomInfo
@@ -57,6 +61,9 @@ import kotlinx.coroutines.withContext
 internal data class JoinFailure(val roomId: String, val reason: ClientFailure)
 
 internal data class MainState(
+    val readingSavedLogin: Boolean = false,
+    val lockedUntil: Long? = null,
+    val unlocking: Boolean = false,
     val address: String = "",
     val connection: ServerConnection? = null,
     val checking: Boolean = true,
@@ -101,11 +108,18 @@ internal class MainViewModel(
     private val taskId: Int? = null,
     private val networkClock: NetworkClock = NetworkClock { NtpTime.query(app) },
 ) : ViewModel() {
-    private val mutableState = MutableStateFlow(MainState())
+    private val mutableState = MutableStateFlow(MainState(readingSavedLogin = restoreOnStart))
     val state = mutableState.asStateFlow()
     val calls = app.calls
     private var session: SessionRepository? = null
+    private var foregroundAuth: AuthenticateCipher? = null
+    private val windowFocused = MutableStateFlow(false)
+    private var restoringOnline = false
+    private var autoUnlock = true
+    private var unlockJob: Job? = null
+    private var lockedExpiryJob: Job? = null
     private var disabledJob: Job? = null
+    private var logoutJob: Job? = null
     private var directoryJob: Job? = null
     private var directoryVisible = false
     private val startup = CompletableDeferred<Unit>()
@@ -124,17 +138,22 @@ internal class MainViewModel(
         checkClock()
         viewModelScope.launch {
             try {
+                val expires = if (restoreOnStart) app.savedLogin.expiration() else null
+                if (expires != null) lockSavedLogin(expires)
+                mutableState.update { it.copy(readingSavedLogin = false) }
                 val saved = if (restoreOnStart) app.settings.server() else ""
                 if (restoreOnStart) {
                     app.settings.discardPersistedLogin()
-                    refreshLocalIdentities()
+                    if (expires == null) refreshLocalIdentities()
                 }
                 val audio = app.settings.audioSettings()
                 calls.audio.configure(audio.first, audio.second, audio.third)
                 mutableState.update { it.copy(address = saved) }
                 if (saved.isNotBlank()) {
                     val previous = app.settings.savedConnection(saved)
-                    if (previous != null) mutableState.update { it.copy(connection = previous) }
+                    if (previous != null && session == null) mutableState.update { it.copy(connection = previous) }
+                    // Unlock rediscovers and pins the protected connection after user verification.
+                    if (expires != null) return@launch
                     val connection = if (previous == null) app.server.discover(saved) else app.server.refresh(previous)
                     app.settings.saveServer(connection)
                     mutableState.update { it.copy(connection = connection) }
@@ -142,9 +161,10 @@ internal class MainViewModel(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
+                if (e.clientFailure().endsSavedLogin()) app.savedLogin.clear()
                 error(e)
             } finally {
-                mutableState.update { it.copy(checking = false) }
+                mutableState.update { it.copy(checking = false, readingSavedLogin = false) }
                 startup.complete(Unit)
             }
         }
@@ -167,6 +187,113 @@ internal class MainViewModel(
     fun clockReady(): Boolean = networkClock.read().also(::showClock).ready
 
     private fun requireClock() = verify(clockReady(), "NETWORK_TIME_REQUIRED")
+
+    fun enterForeground(focused: Boolean = true, authenticate: AuthenticateCipher) {
+        foregroundAuth = authenticate
+        windowFocused.value = focused
+        checkForegroundLogin()
+    }
+
+    fun windowFocusChanged(focused: Boolean) {
+        if (windowFocused.value == focused) return
+        windowFocused.value = focused
+        if (focused && foregroundAuth != null) checkForegroundLogin()
+        else if (restoringOnline) cancelUnlock()
+    }
+
+    private fun checkForegroundLogin() {
+        session?.let { if (it.login.expiresAt <= nowSeconds()) clearSession(it, "SESSION_EXPIRED") }
+        checkLockedLogin()
+    }
+
+    fun leaveForeground() {
+        foregroundAuth = null
+        windowFocused.value = false
+        cancelUnlock()
+    }
+
+    private fun lockSavedLogin(expires: Long) {
+        mutableState.update { it.copy(lockedUntil = expires) }
+        if (checkLockedLogin()) {
+            lockedExpiryJob = viewModelScope.launch {
+                val deadlineMillis = expires.coerceAtMost(Long.MAX_VALUE / 1000) * 1000
+                delay((deadlineMillis - System.currentTimeMillis()).coerceAtLeast(0))
+                if (state.value.lockedUntil == expires) forgetSavedLogin(ClientFailure("SESSION_EXPIRED"))
+            }
+        }
+    }
+
+    private fun checkLockedLogin(): Boolean {
+        val expires = state.value.lockedUntil ?: return false
+        if (expires <= nowSeconds()) {
+            forgetSavedLogin(ClientFailure("SESSION_EXPIRED"))
+            return false
+        }
+        if (autoUnlock && foregroundAuth != null && windowFocused.value) unlock()
+        return true
+    }
+
+    fun unlock() {
+        val authenticate = foregroundAuth ?: return
+        val expires = state.value.lockedUntil ?: return
+        if (unlockJob != null || !windowFocused.value) return
+        autoUnlock = false
+        mutableState.update { it.copy(unlocking = true, error = null) }
+        val job = viewModelScope.launch(start = CoroutineStart.LAZY) {
+            try {
+                verify(nowSeconds() < expires, "SESSION_EXPIRED")
+                val saved = app.savedLogin.open(expires) { cipher ->
+                    if (!windowFocused.value) return@open null
+                    val approved = authenticate(cipher) ?: return@open null
+                    // The system prompt owns focus until its dismissal animation finishes.
+                    windowFocused.first { it }
+                    restoringOnline = true
+                    approved
+                } ?: return@launch
+                networkClock.check(manual = true, ::showClock)
+                state.first { it.clock.status != ClockStatus.Checking }
+                val (next, local) = saved.restore(app.server, app.http, { origin, account ->
+                    IdentitySetup.loadRecord(app.identities, IdentitySetup.scope(origin, account)).active
+                }) {
+                    ensureActive()
+                    if (foregroundAuth !== authenticate || !windowFocused.value || state.value.lockedUntil != expires) throw CancellationException()
+                    requireClock()
+                }
+                ensureActive()
+                activateSession(next, local)
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) {
+                ensureActive()
+                val failure = e.clientFailure("CLIENT_LOCAL_UNLOCK_FAILED")
+                if (failure.endsSavedLogin()) forgetSavedLogin(failure)
+                else if (failure.code != "NETWORK_TIME_REQUIRED") mutableState.update { it.copy(error = failure) }
+            } finally {
+                if (unlockJob === coroutineContext[Job]) {
+                    unlockJob = null
+                    restoringOnline = false
+                    mutableState.update { it.copy(unlocking = false) }
+                }
+            }
+        }
+        unlockJob = job
+        job.start()
+    }
+
+    fun cancelUnlock() {
+        unlockJob?.cancel()
+        unlockJob = null
+        restoringOnline = false
+        mutableState.update { it.copy(unlocking = false) }
+    }
+
+    private fun forgetSavedLogin(reason: ClientFailure? = null) {
+        cancelUnlock()
+        lockedExpiryJob?.cancel()
+        autoUnlock = false
+        app.savedLogin.clear()
+        mutableState.update { it.copy(lockedUntil = null, error = reason,
+            connection = if (reason?.code in setOf("CLIENT_UPDATE_REQUIRED", "SERVER_CONFIGURATION_CHANGED")) null else it.connection) }
+    }
 
     fun editAddress(address: String) {
         if (address.length > 2048 || state.value.checking || state.value.authorizing || session != null || state.value.address == address) return
@@ -204,7 +331,7 @@ internal class MainViewModel(
 
     fun authorize(showQr: Boolean) {
         val current = state.value.connection ?: return
-        if (state.value.authorizing || state.value.checking || session != null || !clockReady()) return
+        if (state.value.authorizing || state.value.checking || state.value.lockedUntil != null || session != null || !clockReady()) return
         mutableState.update { it.copy(authorizing = true, error = null) }
         loginJob = viewModelScope.launch {
             try {
@@ -288,6 +415,7 @@ internal class MainViewModel(
         if (!uri.startsWith(NativeLogin.REDIRECT + "?")) return
         viewModelScope.launch {
             startup.await()
+            if (state.value.lockedUntil != null) return@launch
             // A cold-start browser callback may arrive before the first NTP reply.
             networkClock.check(false, ::showClock)
             state.first { it.clock.status != ClockStatus.Checking }
@@ -329,17 +457,25 @@ internal class MainViewModel(
         loginJob?.cancel()
         setupJob?.cancel()
         closeSetupPairing()
+        if (setup != null) app.savedLogin.clear()
         setup = null
         mutableState.update { it.copy(browser = null, loginQr = null, setupStep = null, checking = false) }
     }
 
     private suspend fun finishSetup(pending: IdentitySetup) {
-        val login = pending.finish(::requireClock)
+        val capable = app.savedLogin.available()
+        val activation = pending.finish(::requireClock, requestResumption = capable)
+        if (setup !== pending) return
+        requireClock()
+        if (activation.saved == null) LogEvent.loginWithoutResumptionGrant.record()
+        try { app.savedLogin.replace(activation.saved) }
+        catch (e: CancellationException) { throw e }
+        catch (_: Exception) { LogEvent.saveLoginForRelaunch.record(LogOutcome.failed, "CLIENT_SECURE_LOGIN_FAILED") }
         if (setup !== pending) return
         requireClock()
         closeSetupPairing()
         val local = pending.record.active ?: throw ChirpException("DEVICE_IDENTITY_REQUIRED")
-        activateSession(SessionRepository(pending.connection, login, app.http), local)
+        activateSession(SessionRepository(pending.connection, activation.login, app.http), local)
         setup = null
     }
     fun setupAction(action: suspend (IdentitySetup) -> Unit) {
@@ -405,9 +541,12 @@ internal class MainViewModel(
     }
 
     internal fun activateSession(next: SessionRepository, local: LocalDevice, authorityKey: String = app.authorityKey) {
+        verify(next.login.expiresAt > nowSeconds(), "SESSION_EXPIRED")
         local.validate()
         verify(local.device == next.login.device, "DEVICE_IDENTITY_REQUIRED")
         next.accountIdentity = AccountIdentity(next, local, app.identities, authorityKey)
+        lockedExpiryJob?.cancel()
+        autoUnlock = false
         directoryJob?.cancel()
         profileImages?.close()
         profileImages = ProfileImages(viewModelScope, next)
@@ -416,7 +555,7 @@ internal class MainViewModel(
         disabledJob?.cancel()
         mutableState.update { it.copy(account = Profile(next.login.memberID, next.login.name, 0), accountDevice = local.device, directory = null, directoryLoadFailed = false,
             connection = next.connection, profileSession = next.login.identity, profileNotice = null, editingProfile = false,
-            authorizing = false, setupStep = null, identity = AccountView(), error = null, browser = null) }
+            lockedUntil = null, unlocking = false, authorizing = false, setupStep = null, identity = AccountView(), error = null, browser = null) }
         disabledJob = viewModelScope.launch(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
             val disabled = launch(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
                 next.http.awaitDisabled(next.login.credential)
@@ -541,11 +680,14 @@ internal class MainViewModel(
     }
 
     fun logout() {
+        if (state.value.lockedUntil != null) {
+            forgetSavedLogin()
+            return
+        }
         val current = session ?: return
-        if (state.value.checking) return
-        viewModelScope.launch {
-            clearSession(current, null)
-            val signedOut = state.value.takeIf { session == null && it.connection === current.connection && !it.authorizing && setup == null }
+        clearSession(current, null)
+        val signedOut = state.value.takeIf { session == null && it.connection === current.connection && !it.authorizing && setup == null }
+        logoutJob = app.taskCleanup.launch {
             try {
                 LogEvent.logout.measure(started = true) { current.logout() }
             } catch (e: CancellationException) { throw e }
@@ -566,10 +708,16 @@ internal class MainViewModel(
         if (failure == null) error(e) else clearSession(current, failure)
     }
 
-    internal fun endTaskSession(): SessionRepository? = session?.also { clearSession(it, null) }
+    internal fun endTaskSession(): Job? {
+        leaveForeground()
+        lockedExpiryJob?.cancel()
+        session?.let { clearSession(it, null, forget = false) }
+        return logoutJob
+    }
 
-    private fun clearSession(current: SessionRepository, failure: String?) {
+    private fun clearSession(current: SessionRepository, failure: String?, forget: Boolean = true) {
         if (session !== current) return
+        if (forget) app.savedLogin.clear()
         calls.leave()
         discardAvatar()
         profileImages?.close()

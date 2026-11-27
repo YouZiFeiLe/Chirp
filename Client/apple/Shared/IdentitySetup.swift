@@ -16,13 +16,14 @@ struct AuthenticatedIdentitySetup: Decodable, Sendable {
 }
 
 enum IdentitySetupAPI {
-    static func post<T: Decodable>(_ path: String, connection: ServerConnection, body: Data, configuration: URLSessionConfiguration? = nil, endpoint: URL? = nil, operation: StaticString = #function) async throws -> T {
+    static func post<T: Decodable>(_ path: String, connection: ServerConnection, body: Data, configuration: URLSessionConfiguration? = nil, endpoint: URL? = nil, requestResumption: Bool = false, operation: StaticString = #function) async throws -> T {
         let configuration = configuration ?? URLSessionConfiguration.ephemeral
         configuration.httpCookieStorage = nil; configuration.urlCache = nil; configuration.timeoutIntervalForRequest = 15
         let session = HTTPDataSession(configuration: configuration); defer { session.close() }
         let url = endpoint ?? connection.passkeyOrigin.appendingPathComponent(path)
         guard ServerAddress.sameOrigin(url, connection.passkeyOrigin) else { throw ClientFailure(.invalidServerConfiguration) }
         var request = URLRequest(url: url); connection.client.apply(to: &request)
+        if requestResumption { request.setValue("1", forHTTPHeaderField: "X-Chirp-Login-Resumption") }
         request.httpMethod = "POST"; request.setValue("application/json", forHTTPHeaderField: "Content-Type"); request.httpBody = body
         let (data, response) = try await session.data(for: request, maxBytes: 65536, operation: operation)
         guard let response = response as? HTTPURLResponse else { throw ClientFailure(.invalidResponse) }
@@ -62,7 +63,7 @@ final class IdentitySetupController {
     private var verifiedFileDigest: String?
     private var enrollment: DeviceIdentityStore?
     private var existingDeviceRejected = false
-    var onComplete: (@MainActor (ClientSession) -> Void)?
+    var onComplete: (@MainActor (ClientSession, SavedLogin?) -> Void)?
     var scope: String { authentication.map { $0.origin + "|" + $0.accountID } ?? "" }
     var isPresented: Bool { step != .idle }
     var filename: String { RecoveryFile.filename(username: authentication?.username ?? "identity") }
@@ -280,17 +281,17 @@ final class IdentitySetupController {
         let message = V5Crypto.message("Chirp identity activation v1", [authentication.origin, authentication.accountID, ClientLoginRequest.clientID,
             V5Crypto.hash(Data(authentication.token.utf8)), V5Crypto.hash(Data(verifier.utf8)), challenge, device.accountKey, device.digest])
         struct Request: Encodable { let setup_token: String; let code_verifier: String; let device: V5Device; let signature: String; let device_name: String }
-        let data: Data = try await IdentitySetupAPI.post("api/client/identity/complete", connection: connection,
-            body: JSONEncoder().encode(Request(setup_token: authentication.token, code_verifier: verifier, device: device, signature: signingIdentity.signIdentityMessage(message), device_name: RecoveryFile.deviceName)), configuration: configuration)
+        let response: ClientSession.Response = try await IdentitySetupAPI.post("api/client/identity/complete", connection: connection,
+            body: JSONEncoder().encode(Request(setup_token: authentication.token, code_verifier: verifier, device: device, signature: signingIdentity.signIdentityMessage(message), device_name: RecoveryFile.deviceName)), configuration: configuration, requestResumption: true)
         guard self.authentication?.token == authentication.token, identity.currentScope == expectedScope else { throw CancellationError() }
         try requireClock()
-        let session = try ClientSession(data: data, connection: connection, expectedDevice: device)
+        let session = try ClientSession(response: response, connection: connection, expectedDevice: device)
         guard session.member.id == authentication.accountID else { throw V5IdentityError.wrongDevice }
         if signingIdentity === identity { try identity.markBound() }
         else { try identity.activateEnrollmentCandidate(signingIdentity) }
         try storage.remove(scope); pending = nil; step = .idle; enrollment = nil; pairing = nil
         password = ""; confirmation = ""; verifier = ""; rootSeed = nil; self.authentication = nil
-        onComplete?(session)
+        onComplete?(session, SavedLogin(session: session, token: response.resumeToken))
     }
     func cancel() { stopPairing(); rootSeed = nil; password = ""; confirmation = ""; verifier = ""; authentication = nil; connection = nil; enrollment = nil; step = .idle }
     func reset() throws { cancel(); pending = nil; try storage.clear() }

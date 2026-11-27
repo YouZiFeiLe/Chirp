@@ -96,6 +96,8 @@ func New(db *store.Store, cfg config.PasskeyConfig, logger *slog.Logger) (http.H
 	mux.HandleFunc("POST /api/client/exchange", s.clientExchange)
 	mux.HandleFunc("POST /api/client/identity/challenge", s.identityChallenge)
 	mux.HandleFunc("POST /api/client/identity/complete", s.identityComplete)
+	mux.HandleFunc("POST /api/client/resume/challenge", s.resumeChallenge)
+	mux.HandleFunc("POST /api/client/resume/complete", s.resumeComplete)
 	mux.HandleFunc("POST /api/client/identity/pairing/start", s.pairingStart)
 	mux.HandleFunc("POST /api/client/identity/pairing/action", s.pairingAction)
 	mux.HandleFunc("POST /api/client/device/start", s.deviceStart)
@@ -442,6 +444,8 @@ func (s *Server) fail(w http.ResponseWriter, r *http.Request, err error) {
 		httpresponse.Error(w, 400, "DEVICE_AUTHORIZATION_EXPIRED", "授权请求已过期、取消或已使用，请在 Chirp 客户端重试")
 	case errors.Is(err, store.ErrInvalidAuthorization):
 		httpresponse.Error(w, 400, "INVALID_AUTHORIZATION", "本次客户端登录已失效，请重新登录")
+	case errors.Is(err, store.ErrResumptionProof):
+		httpresponse.Error(w, 409, "RESUMPTION_PROOF_INVALID", "本次解锁请求未通过验证，请重试")
 	case errors.Is(err, store.ErrInvalidNickname):
 		httpresponse.Error(w, 400, "INVALID_NICKNAME", "昵称须为 3–15 位纯英文字母")
 	case errors.Is(err, store.ErrRegistrationClosed):

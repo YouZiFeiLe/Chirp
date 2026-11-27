@@ -57,7 +57,11 @@ internal fun ChirpApp(activity: ComponentActivity, state: MainState, call: CallS
         onStopOrDispose { model.setDirectoryVisible(false) }
     }
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
-        if (state.setupStep != null) {
+        if (state.readingSavedLogin) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { androidx.compose.material3.CircularProgressIndicator() }
+        } else if (state.lockedUntil != null) {
+            FormPane { LockedLoginScreen(state, model::unlock, model::logout) { model.checkClock(manual = true) } }
+        } else if (state.setupStep != null) {
             LogScreen(LogEvent.identitySetup, state.setupStep)
             IdentitySetupScreen(activity, state, model)
         } else if (state.account == null) {

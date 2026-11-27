@@ -16,6 +16,7 @@ var commandLogOps = map[string]logOp{
 	"discover": {"settings", "discoverServer"}, "confirmConnection": {"settings", "confirmServer"}, "restoreConnection": {"settings", "restoreServer"},
 	"register": {"account", "register"}, "savedIdentities": {"identity", "savedIdentities"}, "savedAccounts": {"account", "savedAccounts"},
 	"browser": {"account", "browserLogin"}, "phone": {"account", "phoneLogin"}, "exchange": {"account", "exchangeLogin"},
+	"resumeLogin": {"account", "resumeLogin"}, "commitResume": {"account", "unlockLogin"},
 	"pollPhone": {"account", "pollPhoneLogin"}, "finishPhone": {"account", "finishPhoneLogin"}, "cancelLogin": {"account", "cancelLogin"}, "logout": {"account", "logout"},
 	"backup": {"identity", "createBackup"}, "unlockBackup": {"identity", "unlockBackup"}, "backupExported": {"identity", "backupExported"},
 	"verifyBackup": {"identity", "verifyBackup"}, "finishBackup": {"identity", "finishBackup"}, "confirmBackup": {"identity", "confirmBackup"}, "recover": {"identity", "recoverIdentity"},
@@ -323,7 +324,7 @@ CLIENT_INVALID_SERVER_CONFIGURATION CLIENT_SERVER_CONFIGURATION_CHANGED CLIENT_S
 CLIENT_UPDATE_REQUIRED CLIENT_VERSION_POLICY_UNAVAILABLE CLIENT_CONFIG_UNAVAILABLE DATABASE_UNAVAILABLE CLIENT_INVALID_ROOM_LIST
 CLIENT_INVALID_PREFLIGHT CLIENT_INVALID_ADMISSION CLIENT_INVALID_JOIN_SEQUENCE CLIENT_JOIN_SEQUENCE_EXHAUSTED CLIENT_LEAVE_FAILED
 CLIENT_INVALID_LOGIN_CALLBACK CLIENT_LOGIN_VERIFICATION_FAILED CLIENT_SECURE_LOGIN_FAILED CLIENT_INVALID_LOGIN_SESSION CLIENT_LOGIN_INCOMPLETE
-CLIENT_LOGIN_EXPIRED CLIENT_LOGIN_CANCELLED CLIENT_INVALID_DEVICE_AUTHORIZATION CLIENT_DEVICE_LOGIN_UNSUPPORTED CLIENT_DEVICE_REQUEST_FAILED
+CLIENT_LOGIN_EXPIRED CLIENT_LOGIN_CANCELLED RESUMPTION_PROOF_INVALID LOGIN_STORAGE_UNAVAILABLE HELLO_KEY_UNAVAILABLE CLIENT_INVALID_DEVICE_AUTHORIZATION CLIENT_DEVICE_LOGIN_UNSUPPORTED CLIENT_DEVICE_REQUEST_FAILED
 CLIENT_DEVICE_STATUS_INVALID CLIENT_QR_GENERATION_FAILED CLIENT_CALL_BUSY CLIENT_SECURE_TRANSPORT_MISSING CLIENT_MICROPHONE_PERMISSION_REQUIRED
 CLIENT_LOCAL_ENCRYPTION_FAILED CLIENT_MICROPHONE_UPDATE_FAILED CLIENT_AUDIO_PRESET_BUSY CLIENT_AUDIO_CONTROL_UNAVAILABLE CLIENT_AUDIO_CONTROL_BUSY
 CLIENT_AUDIO_DEVICE_CHANGE_FAILED CLIENT_MICROPHONE_TEST_FAILED CLIENT_AUDIO_SERVICES_RESET CLIENT_AUDIO_DECRYPTION_RECOVERY_FAILED CLIENT_AUDIO_PRESET_RECOVERY_FAILED
