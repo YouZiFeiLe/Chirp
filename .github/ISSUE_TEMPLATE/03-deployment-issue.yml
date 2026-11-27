@@ -1,0 +1,61 @@
+name: 自托管部署故障 / Deployment issue
+description: 反馈 Compose、反向代理或升级故障。 / Report Compose, proxy or upgrade failures.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        文档修订统一向文档仓库提交 PR。 / Submit documentation changes as pull requests to [Chirp-Doc-Page](https://github.com/YouZiFeiLe/Chirp-Doc-Page).
+
+        [自托管故障排查指南](https://chirp.youzifeile.com/hosting/troubleshooting) · [Self-hosting troubleshooting guide](https://chirp.youzifeile.com/en/hosting/troubleshooting)
+
+  - type: dropdown
+    id: setup
+    attributes:
+      label: 部署方式 / Deployment method
+      options:
+        - Docker Compose + 内置 SWAG / Bundled SWAG
+        - Docker Compose + 自有反向代理 / Existing reverse proxy
+        - Docker Compose 直连 / Direct access without a proxy
+        - 源码构建 / Built from source
+        - 其他或不确定 / Other or unsure
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: 部署环境与版本 / Environment and versions
+      description: |
+        填写主机系统和架构、Chirp 镜像标签或提交号，以及 Docker Compose 版本（如适用）。升级故障请注明升级前后的版本。
+        Include the host OS and architecture, Chirp image tag or commit, and Docker Compose version if applicable. For upgrades, give both versions.
+    validations:
+      required: true
+
+  - type: textarea
+    id: failure
+    attributes:
+      label: 哪一步失败了？ / Which step failed?
+      description: 描述触发故障的步骤、预期结果和实际现象。 / Give the steps, what you expected and what happened.
+    validations:
+      required: true
+
+  - type: upload
+    id: chirplog
+    attributes:
+      label: 已脱敏的客户端日志 / Redacted client log (.chirplog)
+      description: |
+        在客户端「设置 → 日志管理」开启「记录客户端日志」，尝试连接该实例后选择「导出日志」。将导出的 .chirplog 文件压缩为 .zip 并上传。
+        In Settings → Log Management, enable logging, try connecting to the affected instance, then select Export Logs. Zip the exported .chirplog file and attach the .zip here.
+    validations:
+      required: true
+      accept: ".zip"
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: 服务状态或错误日志 / Service status or error logs
+      description: |
+        可附 `docker compose ps` 中相关服务的状态和已脱敏的错误行。请将 `.env` 文件、DNS 凭据和 LiveKit 密钥保留在本地。
+        Include the affected service's status from `docker compose ps` and relevant redacted error lines. Keep `.env` files, DNS credentials and LiveKit keys private.
+      render: text
