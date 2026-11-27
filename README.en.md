@@ -69,11 +69,13 @@
 >
 > Audio transport runs over a self-hosted **LiveKit** SFU paired with **RNNoise** neural noise suppression across every client—in real daily calls with friends, the clarity and background cleanup feel genuinely great.
 >
-> **Huge thanks to Astra—and AI assistance—for making it possible for one solo developer to build the entire backend alongside all 4 native platform clients.** I've manually reviewed every single client screen and feature many times over, so everything should be solid—and if you do spot a rough edge or bug, please open an [Issue](https://github.com/YouZiFeiLe/Chirp/issues)!
+> **Huge thanks to Astra—and AI assistance—for making it possible for one solo developer to build the entire backend alongside all 4 native platform clients.** I've manually reviewed every single client screen and feature many times over, so everything should be solid—and if you do spot a rough edge or a non-security bug, please open an [Issue](https://github.com/YouZiFeiLe/Chirp/issues)! If you suspect a vulnerability, please follow the [security policy](SECURITY.md#english) to report it privately.
 >
 > Whether your friends are on macOS, iOS, Android, or Windows, everyone joins the same encrypted rooms for live voice chat, ephemeral text messages, and secure file sharing (though personally I still wouldn't recommend using this as your main file-sharing drive… 😅).
 >
 > One person's time and energy only go so far—even with AI helping out, solo-maintaining one Go backend plus four native client apps is still a heavy lift. There is plenty of room to polish, so suggestions, ideas, and pull requests are all warmly welcome!
+
+For local development, testing and pull requests, see the [contributing guide](CONTRIBUTING.en.md).
 
 ---
 

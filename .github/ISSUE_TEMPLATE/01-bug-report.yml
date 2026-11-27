@@ -1,0 +1,63 @@
+name: 故障报告 / Bug report
+description: 反馈客户端或服务端的异常行为。 / Report unexpected client or server behavior.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        文档修订统一向文档仓库提交 PR。 / Submit documentation changes as pull requests to [Chirp-Doc-Page](https://github.com/YouZiFeiLe/Chirp-Doc-Page).
+
+        [搜索已有问题 / Search existing issues](https://github.com/YouZiFeiLe/Chirp/issues?q=is%3Aissue) · [私下报告安全漏洞 / Report a vulnerability privately](https://github.com/YouZiFeiLe/Chirp/security/advisories/new)
+
+  - type: dropdown
+    id: components
+    attributes:
+      label: 涉及的平台或组件 / Affected platforms or components
+      multiple: true
+      options:
+        - macOS
+        - iOS
+        - Android
+        - Windows
+        - 服务端 / Server
+        - 网页管理台 / Web admin console
+        - 其他或不确定 / Other or unsure
+    validations:
+      required: true
+
+  - type: textarea
+    id: versions
+    attributes:
+      label: Chirp 与系统版本 / Chirp and OS versions
+      description: |
+        请列出受影响设备的系统和 Chirp 版本或提交号。如果知道服务端版本，也请一并填写。
+        Give the OS and Chirp version or commit for each affected device. Include the server version if known.
+    validations:
+      required: true
+
+  - type: textarea
+    id: behavior
+    attributes:
+      label: 实际与预期结果 / Actual and expected behavior
+      description: 你看到了什么？原本应该发生什么？ / What happened, and what did you expect?
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤 / Steps to reproduce
+      description: 若问题偶发，请描述发生前的操作和出现频率。 / For an intermittent issue, describe what you did just before it happened and how often it occurs.
+    validations:
+      required: true
+
+  - type: upload
+    id: chirplog
+    attributes:
+      label: 已脱敏的客户端日志 / Redacted client log (.chirplog)
+      description: |
+        在客户端「设置 → 日志管理」开启「记录客户端日志」，复现故障后选择「导出日志」。将导出的 .chirplog 文件压缩为 .zip 并上传。
+        In Settings → Log Management, enable logging, reproduce the issue, then select Export Logs. Zip the exported .chirplog file and attach the .zip here.
+    validations:
+      required: true
+      accept: ".zip"

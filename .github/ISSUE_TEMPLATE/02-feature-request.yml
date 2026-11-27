@@ -1,0 +1,30 @@
+name: 功能建议 / Feature request
+description: 提出新功能或体验改进。 / Suggest a feature or improvement.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        文档修订统一向文档仓库提交 PR。 / Submit documentation changes as pull requests to [Chirp-Doc-Page](https://github.com/YouZiFeiLe/Chirp-Doc-Page).
+
+  - type: textarea
+    id: use-case
+    attributes:
+      label: 使用场景 / Use case
+      description: 你在哪个平台上想完成什么？目前遇到了什么限制？ / What are you trying to do, on which platform, and what gets in the way?
+    validations:
+      required: true
+
+  - type: textarea
+    id: outcome
+    attributes:
+      label: 期望的改进 / Desired outcome
+      description: 改进后，你希望怎样完成这件事？ / How would you like this to work?
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 尝试过的替代方案 / Workarounds tried
+      description: 如果已有临时做法，它还有哪些不足？ / If you have a workaround, where does it fall short?

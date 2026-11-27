@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 提交文档修订 PR / Submit a documentation pull request
+    url: https://github.com/YouZiFeiLe/Chirp-Doc-Page
+    about: 文档纠错和补充统一在 Chirp-Doc-Page 提交 PR。 / Submit all documentation changes as pull requests in Chirp-Doc-Page.
+  - name: 私下报告安全漏洞 / Report a vulnerability privately
+    url: https://github.com/YouZiFeiLe/Chirp/security/advisories/new
+    about: 通过 GitHub 将漏洞详情私下发给维护者。 / Share vulnerability details privately with the maintainer.
+  - name: Chirp 使用与部署文档 / Chirp documentation
+    url: https://chirp.youzifeile.com/
+    about: 查看客户端安装、自托管与故障排查指南。 / Find client installation, self-hosting and troubleshooting guides.
